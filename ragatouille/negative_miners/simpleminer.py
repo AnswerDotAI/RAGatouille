@@ -1,6 +1,6 @@
 from enum import Enum
 from pathlib import Path
-from typing import Literal, Union
+from typing import Literal, Union, Optional
 from sentence_transformers import SentenceTransformer
 import torch
 from voyager import Index, Space, StorageDataType
@@ -38,7 +38,11 @@ class SimpleMiner(HardNegativeMiner):
         if language_code not in ["en", "zh"]:
             language_code = "other"
         self.model_name = f"{language_code}_{model_size}"
-        self.model = SentenceTransformer(DenseModels[self.model_name].value)
+        hub_model = DenseModels[self.model_name].value
+        print(f"Loading Hard Negative SimpleMiner dense embedding model {hub_model}...")
+        self.model = SentenceTransformer(hub_model)
+        self.has_index = False
+        self.min_rank = 10
 
     def build_index(
         self,
@@ -51,14 +55,15 @@ class SimpleMiner(HardNegativeMiner):
         print(f"Building hard negative index for {len(collection)} documents...")
         if len(collection) > 1000:
             pool = self.model.start_multi_process_pool()
-            embeds = self.encode_multi_process(collection, pool, batch_size=batch_size)
+            embeds = self.model.encode_multi_process(
+                collection, pool, batch_size=batch_size
+            )
             self.model.stop_multi_process_pool(pool)
         else:
-            embeds = self.encode(collection, batch_size=batch_size)
+            embeds = self.model.encode(collection, batch_size=batch_size)
 
         print("All documents embedded, now adding to index...")
 
-        self.min_rank = 10
         self.max_rank = min(110, int(len(collection) // 10))
         self.max_rank = min(self.max_rank, len(collection))
 
@@ -93,35 +98,51 @@ class SimpleMiner(HardNegativeMiner):
         else:
             print("save_index set to False, skipping saving hard negative index")
         print("Hard negative index generated")
+        self.has_index = True
 
     def query_index(self, query, top_k=110):
-        query_embed = self.encode([query])[0]
-        results = self.voyager_index.query(query_embed, top_k=top_k)
+        results = self.voyager_index.query(
+            query, k=min(top_k, self.voyager_index.__len__())
+        )
         return results
 
     def mine_hard_negatives(
         self,
-        queries: list[str],
-        collection: list[str],
+        queries: Union[list[str], str],
+        collection: Optional[list[str]] = None,
         save_index: bool = False,
         save_path: Union[str, Path] = None,
         force_fp32: bool = True,
-        neg_k: int = 10,
     ):
-        self.build_index(
-            collection,
-            save_index=save_index,
-            save_path=save_path,
-            force_fp32=force_fp32,
-        )
-        return self._mine(queries, k=neg_k)
+        if self.has_index is False and collection is not None:
+            self.build_index(
+                collection,
+                save_index=save_index,
+                save_path=save_path,
+                force_fp32=force_fp32,
+            )
+        if isinstance(queries, str):
+            print("mining")
+            return self._mine(queries)
+        return self._batch_mine(queries)
 
     def _mine(
         self,
-        queries: list[str],
-        k: int = 10,
+        query: str,
     ):
-        print(f"Retrieving {k} hard negatives for {len(queries)} queries...")
+        q_emb = self.model.encode(query)
+        query_results = self.query_index(q_emb, top_k=self.max_rank)
+        if len(query_results) > self.min_rank:
+            query_results = query_results[self.min_rank : self.max_rank]
+        query_results = [self.corpus_map[x] for x in query_results[0]]
+        return query_results
+
+    def _batch_mine(
+        self,
+        queries: list[str],
+    ):
+        """Separate function to parallelise later on"""
+        print(f"Retrieving hard negatives for {len(queries)} queries...")
         results = []
         print("Embedding queries...")
         query_embeddings = self.model.encode(queries, show_progress_bar=True)
@@ -130,14 +151,10 @@ class SimpleMiner(HardNegativeMiner):
             query_results = self.query_index(q_emb, top_k=self.max_rank)
             query_results = query_results[self.min_rank : self.max_rank]
             query_results = [self.corpus_map[x.id] for x in query_results]
-            results.append(query_results[:k])
-        print(
-            f"""Done generating hard negatives.
-Generated {k} hard negatives for {len(queries)} queries.
-Total: {len(queries) * k}."""
-        )
+            results.append(query_results)
+        print(f"""Done generating hard negatives.""")
         return results
 
-    def export_index(self, path: str | Path) -> bool:
+    def export_index(self, path: Union[str, Path]) -> bool:
         self.voyager_index.save(path)
         return True

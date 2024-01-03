@@ -1,19 +1,26 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any
+from typing import Union
 
 
 class HardNegativeMiner(ABC):
     @abstractmethod
-    def get_name(self) -> str:
+    def export_index(self, path: Union[str, Path]) -> bool:
         ...
 
     @abstractmethod
-    def build_index(
-        self, collection: list[str], batch_size: int, save_index: bool, path: str | Path
-    ) -> Any:
+    def mine_hard_negatives(
+        self,
+        queries: list[str],
+        collection: list[str],
+        neg_k: int,
+    ):
         ...
 
     @abstractmethod
-    def export_index(self, path: str | Path) -> bool:
+    def _mine(
+        self,
+        queries: list[str],
+        k: int,
+    ):
         ...

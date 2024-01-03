@@ -1,0 +1,53 @@
+site_name: RAGatouille
+site_author: Benjamin Clavié
+site_description: Bridging the gap between state-of-the-art Retrieval research and RAG applications.
+repo_name: RAGatouille
+repo_url: https://github.com/bclavie/RAGatouille/
+site_url: https://ragatouille.clavie.eu
+edit_uri: edit/main/docs/
+copyright: Copyright &copy; 2024 Benjamin Clavié
+plugins:
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            members_order: alphabetical
+            allow_inspection: true
+            show_bases: true
+theme:
+  name: material
+  features:
+    - content.code.annotate
+    - content.code.copy
+    - content.code.select
+    - content.tabs.link
+    - content.tooltips
+    - header.autohide
+    - navigation.expand
+    - navigation.footer
+    - navigation.indexes
+    - navigation.instant
+    - navigation.instant.prefetch
+    - navigation.instant.progress
+    - navigation.prune
+    - navigation.sections
+    - navigation.tabs
+    - navigation.top
+    - navigation.tracking
+    - toc.follow
+  palette:
+      - scheme: default
+        primary: green
+        accent: teal
+        toggle:
+          icon: material/brightness-5
+          name: Switch to dark mode
+      - scheme: slate
+        primary: black
+        accent: green
+        toggle:
+          icon: material/brightness-6
+          name: Switch to light mode
+  font:
+    text: Roboto
+    code: Roboto Mono
