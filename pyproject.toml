@@ -15,8 +15,8 @@ transformers = "^4.36.2"
 voyager = "^2.0.2"
 sentence-transformers = "^2.2.2"
 torch = "^2.0.1"
-colbert-ir = {git = "https://github.com/stanford-futuredata/ColBERT.git"}
 llama-index = "^0.9.24"
+colbert-ai = "^0.2.15"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"

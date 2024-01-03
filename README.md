@@ -19,11 +19,6 @@ The Information Retrieval research field has recently been booming, and models l
 This is where __RAGatouille__ comes in: RAGatouille's purpose is to bridge this gap: make it easy to use state-of-the-art methods in your RAG pipeline, without having to worry about the details or the years of litterature! At the moment, RAGatouille focuses on making ColBERT simple to use. If you want to check out what's coming next, you can check out our [broad roadmap](https://ben.clavie.eu/ragatouille/roadmap)!
 
 _If you want to read more about the motivations, philosophy, and why the late-interaction approach used by ColBERT works so well, check out the [introduction in the docs](https://ben.clavie.eu/ragatouille/)._
-<!-- 
-
- This makes sense: language is complex, and expecting a single model to capture every single question you could have about a sentence or a document in a single vector is a tall order!
-
-Historically, Information Retrieval (IR) and NLP research have occasionally interacted, but been mostly separate. IR has been very active at building retrieval methods that can generalise to your data better, but a lot of those advances are not well known nor very usable. One such example is ColBERT, a late-interaction model that has [repeatedly]() [been]() [shown]() [to be the]() [best model]() [to generalise]() [to new domains]() (that includes both new documents and new ways of phrasing queries!) -->
 
 
 
@@ -44,6 +39,7 @@ In this section, we'll quickly walk you through the three core aspects of RAGato
 - [🗄️ Embedding and Indexing Documents](#indexing)
 - [🔎 Retrieving documents](#retrieving-documents)
 
+➡️ If you want just want to read fully functional code examples, head over to the `/examples/` folder on this repo! ⬅️
 
 ### 🚀 Training and fine-tuning
 

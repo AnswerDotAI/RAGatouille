@@ -549,13 +549,15 @@ gs = ["google-cloud-storage"]
 s3 = ["boto3"]
 
 [[package]]
-name = "colbert-ir"
-version = "0.2.14"
+name = "colbert-ai"
+version = "0.2.15"
 description = "Efficient and Effective Passage Search via Contextualized Late Interaction over BERT"
 optional = false
 python-versions = ">=3.8"
-files = []
-develop = false
+files = [
+    {file = "colbert-ai-0.2.15.tar.gz", hash = "sha256:ad3266871e9a8719b1352019cac1cd8caa23b735c351d50ff9445137a05c4969"},
+    {file = "colbert_ai-0.2.15-py3-none-any.whl", hash = "sha256:231c91a0c68a6e07a1105023e1deeb9d230709870a019d21334027ea0bcd1977"},
+]
 
 [package.dependencies]
 bitarray = "*"
@@ -574,12 +576,6 @@ ujson = "*"
 faiss-cpu = ["faiss-cpu (>=1.7.0)"]
 faiss-gpu = ["faiss-gpu (>=1.7.0)"]
 torch = ["torch (==1.13.1)"]
-
-[package.source]
-type = "git"
-url = "https://github.com/stanford-futuredata/ColBERT.git"
-reference = "HEAD"
-resolved_reference = "c0980e00843b1e370f30edc19165ca39592f604d"
 
 [[package]]
 name = "colorama"
@@ -4530,4 +4526,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "d0637713589ae9a9c671c0cbe9cce8d587ea6a5817273f2edf2917e590cfa3ca"
+content-hash = "eedee42a2ecc9d01c41b7f88171b96635bc2bb5c22bae4fbf561bb3314b77af6"
