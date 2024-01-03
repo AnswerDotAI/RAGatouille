@@ -4,21 +4,23 @@ _State-of-the-art document retrieval methods, in just a few lines of code._
 
 ---
 
-Welcome to the documentation for RAGatouille. This section is mostly 🚧 Under Construction 🚧, but you can find a quick explainer for RAGatouille's philosophy and the strong performance of late-interaction models like ColBERT on this page, check out the [API reference for the main classes](https://ben.clavie.eu/ragatouille/api) as well as the [rough, ever-evolving roadmap](https://ben.clavie.eu/ragatouille/roadmap). The documentation will be actively updated in the next few weeks!
+Welcome to the docs for RAGatouille. This page presents RAGatouille's philosophy. We also discuss late interaction retrievers, like ColBERT, and what makes their quality so high.
+
+While you're here, check out the [API reference](https://ben.clavie.eu/ragatouille/api) and the [evolving roadmap](https://ben.clavie.eu/ragatouille/roadmap). The docs will be actively updated in the next few weeks!
 
 ## Philosophy
 
-RAGatouille's philosophy is two-fold.:
+RAGatouille's philosophy is two-fold:
 
-### Motivation/Aim
+### Motivation
 
-The first one is the __aim of this library__: bridging the seemingly growing gap between Information Retrieval litterature and everyday production retrieval uses. I'm not myself an IR researcher, and barely a practitioner: my own background is in NLP. However, the concept behind late-interaction retrievers and the many papers highlighting they're consistently better than dense embeddings on just about any zero-shot task have led me to them. On top of this, you don't need to use them zero-shot: they're very easy to adapt to new domains due to their bag-of-embeddings approach.
+The aim of RAGatouille is to close the growing gap between the Information Retrieval literature and everyday production retrieval uses. I'm not myself an IR researcher (my own background is in NLP), but I have arrived at late interaction retrievers through the many papers highlighting they're consistently better than dense embeddings on just about any zero-shot task, at least when tested apples-to-apples! Maybe more importantly, you don't need to use them zero-shot: they're very easy to adapt to new domains due to their **bag-of-embeddings** approach.
 
 However, it's been a consistently hard sell, and starting to use ColBERT on real projects wasn't particularly smooth. IR is a field that is outwardly more _stern_ than NLP, and the barrier-to-entry is higher. A lot of the IR frameworks, like Terrier or Anserini, are absolutely fantastic, but they just don't fit into the pythonic day-to-day workflows we're used to.
 
 For sentence transformers adoption, the aptly (re-)name SentenceTransformers library has been a boon. RAGatouille doesn't quite have the pretention to be that, but it aims to help democratise the easy training and use ColBERT and pals. To do so, we also take an approach of avoiding re-implementing whenever possible, to speed up iteration.
 
-If a paper has open-sourced its code, our goal is for RAGatouille to be a gateway to it, rather than a complete replacement, whenever possible! (_This might change in the future as the library grows_) Moreover, this is a mutually beneficial parasitic relationships, as the early development of this lib has already resulted in a few upstreamed fixes on the main ColBERT repo!
+If a paper has open-sourced its code, our goal is for RAGatouille to be a gateway to it, rather than a complete replacement, whenever possible! (_This might change in the future as the library grows!_) Moreover, this is a mutually beneficial parasitic relationships, as the early development of this lib has already resulted in a few upstreamed fixes on the main ColBERT repo!
 
 ### Code Philosophy
 
