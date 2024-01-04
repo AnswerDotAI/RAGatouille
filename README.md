@@ -39,7 +39,7 @@ In this section, we'll quickly walk you through the three core aspects of RAGato
 - [🗄️ Embedding and Indexing Documents](#indexing)
 - [🔎 Retrieving documents](#retrieving-documents)
 
-➡️ If you want just want to read fully functional code examples, head over to the `/examples/` folder on this repo! ⬅️
+➡️ If you want just want to see fully functional code examples, head over to the [examples](https://github.com/bclavie/RAGatouille/tree/main/examples)⬅️
 
 ### 🚀 Training and fine-tuning
 
@@ -72,15 +72,10 @@ ColBERT prefers to store processed training data on-file, which also makes easie
 Just like all things in RAGatouille, `prepare_training_data` uses strong defaults, but is also fully parameterable.
 <!-- Check out the [Data Processing](https://ben.clavie.eu/ragatouille/data-processing) section of the docs! -->
 
-#### Fine-tuning
+#### Running the Training/Fine-Tuning
 
-Fine-tuning an existing ColBERT model takes just a few lines of code.
+Training and Fine-Tuning follow the exact same process. When you instantiate `RAGTrainer`, you must pass it a `pretrained_model_name`. If this pretrained model is a ColBERT instance, the trainer will be in fine-tuning mode, if it's another kind of transformer, it will be in training mode to begin training a new ColBERT initialised from the model's weights!
 
-```python
-pass
-```
-
-#### Training
 
 ```python
 from ragatouille import RAGTrainer
@@ -91,9 +86,20 @@ pairs = [
     ...
 ]
 
-trainer = RAGTrainer()
-[...]
+my_full_corpus = ["Any document that you have in your data that isn't necessarily tied to a query", "Another document", ...]
+
+trainer = RAGTrainer(model_name = "MyFineTunedColBERT",
+        pretrained_model_name = "colbert-ir/colbert-v2.0") # In this example, we run fine-tuning
+
+# This step handles all the data processing, check the examples for more details!
+trainer.prepare_training_data(raw_data=pairs,
+                                data_out_path="./data/",
+                                all_documents=my_full_corpus)
+
+trainer.train(batch_size=32) # Train with the default hyperparams
 ```
+
+When you run `train()`, it'll by default inherit its parent ColBERT hyperparameters if fine-tuning, or use the default training parameters if training a new ColBERT. Feel free to modify them as you see fit (check the example and API reference for more details!)
 
 
 ### 🗄️ Indexing
