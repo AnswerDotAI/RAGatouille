@@ -10,13 +10,13 @@ _Easily use and train state of the art retrieval methods in any RAG pipeline. De
 
 ---
 
-The main motivation of RAGatouille is simple: bridging the gap between state-of-the-art research and alchemical RAG pipeline practices. RAG is complex, and there are many moving parts. To get the best performance, you need to optimise for many compoents: among them, a very important one is the models you use for retrieval.
+The main motivation of RAGatouille is simple: bridging the gap between state-of-the-art research and alchemical RAG pipeline practices. RAG is complex, and there are many moving parts. To get the best performance, you need to optimise for many components: among them, a very important one is the models you use for retrieval.
 
 Dense retrieval, i.e. using embeddings such as OpenAI's `text-ada-002`, is a good baseline, but there's a lot of research [showing dense embeddings might not be the](https://arxiv.org/abs/2104.08663) [best fit for **your** usecase](https://arxiv.org/abs/2204.11447).
 
-The Information Retrieval research field has recently been booming, and models like ColBERT have been shown to [generalise better](https://arxiv.org/abs/2203.10053) [to new or complex domains](https://aclanthology.org/2022.findings-emnlp.78/) [than dense embeddings](https://arxiv.org/abs/2205.02870), are [ridiculously data-efficient](https://arxiv.org/abs/2309.06131) and are even [better suited to fficiently being trained](https://arxiv.org/abs/2312.09508) [on non-English languages with low amount of data](https://arxiv.org/abs/2312.16144)! Unfortunately, most of those new approaches aren't very well known, and are much harder to use than dense embeddings.
+The Information Retrieval research field has recently been booming, and models like ColBERT have been shown to [generalise better](https://arxiv.org/abs/2203.10053) [to new or complex domains](https://aclanthology.org/2022.findings-emnlp.78/) [than dense embeddings](https://arxiv.org/abs/2205.02870), are [ridiculously data-efficient](https://arxiv.org/abs/2309.06131) and are even [better suited to efficiently being trained](https://arxiv.org/abs/2312.09508) [on non-English languages with low amount of data](https://arxiv.org/abs/2312.16144)! Unfortunately, most of those new approaches aren't very well known, and are much harder to use than dense embeddings.
 
-This is where __RAGatouille__ comes in: RAGatouille's purpose is to bridge this gap: make it easy to use state-of-the-art methods in your RAG pipeline, without having to worry about the details or the years of litterature! At the moment, RAGatouille focuses on making ColBERT simple to use. If you want to check out what's coming next, you can check out our [broad roadmap](https://ben.clavie.eu/ragatouille/roadmap)!
+This is where __RAGatouille__ comes in: RAGatouille's purpose is to bridge this gap: make it easy to use state-of-the-art methods in your RAG pipeline, without having to worry about the details or the years of literature! At the moment, RAGatouille focuses on making ColBERT simple to use. If you want to check out what's coming next, you can check out our [broad roadmap](https://ben.clavie.eu/ragatouille/roadmap)!
 
 _If you want to read more about the motivations, philosophy, and why the late-interaction approach used by ColBERT works so well, check out the [introduction in the docs](https://ben.clavie.eu/ragatouille/)._
 
@@ -53,7 +53,7 @@ RAGatouille's RAGTrainer has a built-in `TrainingDataProcessor`, which can take 
 - Automatically remove all duplicates and maps all positives/negatives to their respective query.
 - By default, mine hard negatives: this means generating negatives that are hard to distinguish from positives, and that are therefore more useful for training.
 
-This is all handled by `RAGTrainer.pepare_training_data()`, and is as easy as doing passing your data to it:
+This is all handled by `RAGTrainer.prepare_training_data()`, and is as easy as doing passing your data to it:
 
 ```python
 from ragatouille import RAGTrainer
@@ -117,7 +117,7 @@ index_path = RAG.index("my_index", my_documents)
 Once this is done running, your index will be saved on-disk and ready to be queried! RAGatouille and ColBERT handle everything here:
 - Tokenizing your documents
 - Identifying the individual terms
-- Embeding the documents and generating the bags-of-embeddings
+- Embedding the documents and generating the bags-of-embeddings
 - Compressing the vectors and storing them on disk
 
 Curious about how this works? Check out the [Late-Interaction & ColBERT concept explainer](https://ben.clavie.eu/ragatouille/concepts)
@@ -125,7 +125,7 @@ Curious about how this works? Check out the [Late-Interaction & ColBERT concept 
 
 ### 🔎 Retrieving Documents
 
-Once an index's created, querying it is just as simple as creating it! You can either load the model you need directly from an index's configuration:
+Once an index is created, querying it is just as simple as creating it! You can either load the model you need directly from an index's configuration:
 
 ```python
 from ragatouille import RAGPretrainedModel
