@@ -109,7 +109,7 @@ To create an index, you'll need to load a trained model, this can be one of your
 ```python
 from ragatouille import RAGPretrainedModel
 
-RAG = RAGPretrainedModel.from_pretrained("colbert-ir/colbert-v2.0")
+RAG = RAGPretrainedModel.from_pretrained("colbert-ir/colbertv2.0")
 my_documents = ["This is a great excerpt from my wealth of documents", "Once upon a time, there was a great document", ...]
 index_path = RAG.index(index_name="my_index", collection=my_documents)
 ```
