@@ -3,6 +3,7 @@ from pathlib import Path
 from colbert.infra import Run, ColBERTConfig, RunConfig
 from colbert import Indexer, Searcher, Trainer, IndexUpdater
 import torch
+import srsly
 
 from ragatouille.models.base import LateInteractionModel
 
@@ -18,6 +19,7 @@ class ColBERT(LateInteractionModel):
         **kwargs,
     ):
         self.verbose = verbose
+        self.collection = None
         if n_gpu == -1:
             n_gpu = 1 if torch.cuda.device_count() == 0 else torch.cuda.device_count()
 
@@ -31,6 +33,9 @@ class ColBERT(LateInteractionModel):
             )
             self.checkpoint = self.config.checkpoint
             self.index_name = self.config.index_name
+            self.collection = self._get_collection_from_file(
+                str(Path(pretrained_model_name_or_path) / "collection.json")
+            )
         else:
             ckpt_config = ColBERTConfig.load_from_checkpoint(
                 str(pretrained_model_name_or_path)
@@ -57,6 +62,12 @@ class ColBERT(LateInteractionModel):
         updater.add(new_documents)
         updater.persist_to_disk()
 
+    def _get_collection_from_file(self, collection_path: str):
+        return srsly.read_json(collection_path)
+
+    def _write_collection_to_file(self, collection, collection_path: str):
+        srsly.write_json(collection_path, collection)
+
     def add_to_index(
         self,
         new_documents: list[str],
@@ -78,6 +89,7 @@ class ColBERT(LateInteractionModel):
         searcher = Searcher(
             checkpoint=self.checkpoint,
             config=None,
+            collection=self.collection,
             index=self.index_name,
             verbose=self.verbose,
         )
@@ -85,7 +97,12 @@ class ColBERT(LateInteractionModel):
         current_len = len(searcher.collection)
         new_doc_len = len(new_documents)
 
-        if current_len + new_doc_len < 5000 or new_doc_len > current_len * 0.05:
+        if (
+            current_len + new_doc_len < 5000
+            or new_doc_len > current_len * 0.05
+            or current_len + new_doc_len
+            > 100  # Export bug handler -- TODO: Remove this requirement
+        ):
             new_documents += [x for x in searcher.collection]
             self.index(
                 new_documents,
@@ -149,6 +166,14 @@ class ColBERT(LateInteractionModel):
         self.indexer.index(
             name=self.index_name, collection=collection, overwrite=overwrite
         )
+
+        index_path = str(
+            Path(self.run_config.root)
+            / Path(self.run_config.experiment)
+            / "indexes"
+            / self.index_name
+        )
+        self._write_collection_to_file(collection, index_path + "/collection.json")
         print("Done indexing!")
 
     def _load_searcher(
@@ -177,6 +202,7 @@ class ColBERT(LateInteractionModel):
         self.searcher = Searcher(
             checkpoint=self.checkpoint,
             config=None,
+            collection=self.collection,
             index=self.index_name,
         )
 
