@@ -34,7 +34,7 @@ class ColBERT(LateInteractionModel):
             self.checkpoint = self.config.checkpoint
             self.index_name = self.config.index_name
             self.collection = self._get_collection_from_file(
-                str(Path(pretrained_model_name_or_path) / "collection.json")
+                str(pretrained_model_name_or_path / "collection.json")
             )
         else:
             ckpt_config = ColBERTConfig.load_from_checkpoint(
@@ -149,6 +149,7 @@ class ColBERT(LateInteractionModel):
             self.index_name = self.checkpoint + "new_index"
 
         collection = list(set(collection))
+        self.collection = collection
 
         nbits = 2
         if len(collection) < 5000:
