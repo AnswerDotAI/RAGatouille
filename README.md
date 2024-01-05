@@ -25,6 +25,11 @@ _If you want to read more about the motivations, philosophy, and why the late-in
 
 Want to give it a try? Nothing easier, just run `pip install ragatouille` and you're good to go!
 
+** ⚠️ RAGatouille currently has two running requirements: ⚠️
+
+- If running inside a script, you must run it inside `if __name__ == "__main__"`
+- It does not currently support Google Colab **
+
 ## Get Started
 
 RAGatouille makes it as simple as can be to use ColBERT! We want the library to work on two levels:
