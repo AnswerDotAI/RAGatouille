@@ -26,24 +26,28 @@ def export_to_huggingface_hub(
     export_vespa_onnx: bool = False,
     use_tmp_dir: bool = False,
 ):
+    # ensure model contains a valid ColBERT config before exporting
+    colbert_config = ColBERTConfig.load_from_checkpoint(colbert_path)
+    try:
+        assert colbert_config is not None
+    except Exception:
+        print(f"Path {colbert_path} does not contain a valid ColBERT config!")
+
     export_path = colbert_path
     if use_tmp_dir:
         export_path = ".tmp/hugging_face_export"
         print("Using tmp dir to store export files...")
-    print(f"Loading model located at {colbert_path}")
+        colbert_model = ColBERT(
+            colbert_path,
+            colbert_config=colbert_config,
+        )
+        print(f"Model loaded... saving export files to disk at {export_path}")
+        try:
+            save_model = colbert_model.save
+        except Exception:
+            save_model = colbert_model.module.save
+        save_model(export_path)
 
-    colbert_config = ColBERTConfig.load_from_checkpoint(colbert_path)
-    assert colbert_config is not None
-    colbert_model = ColBERT(
-        colbert_path,
-        colbert_config=colbert_config,
-    )
-    print(f"Model loaded... saving export files to disk at {export_path}")
-    try:
-        save_model = colbert_model.save
-    except Exception:
-        save_model = colbert_model.module.save
-    save_model(export_path)
     if export_vespa_onnx:
         export_to_vespa_onnx(colbert_path, out_path=export_path)
     try:
