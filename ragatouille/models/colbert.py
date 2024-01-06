@@ -1,3 +1,4 @@
+import os
 from typing import Union, Optional
 from pathlib import Path
 from colbert.infra import Run, ColBERTConfig, RunConfig
@@ -285,6 +286,7 @@ class ColBERT(LateInteractionModel):
             )
 
             trainer.train(checkpoint=self.checkpoint)
+            print(os.path.join(Run().path_, "checkpoints"))
 
     def __del__(self):
         # Clean up context
