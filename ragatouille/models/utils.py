@@ -1,10 +1,14 @@
-from pathlib import Path
 import random
-from transformers import BertPreTrainedModel, AutoModel
-from colbert.infra import ColBERTConfig
+import shutil
+from pathlib import Path
+
 import torch
 import torch.nn as nn
+from colbert.infra import ColBERTConfig
 from colbert.modeling.colbert import ColBERT
+from huggingface_hub import HfApi
+from huggingface_hub.utils import HfHubHTTPError
+from transformers import BertPreTrainedModel, AutoModel
 
 
 def seeded_shuffle(collection: list, seed: int = 42):
@@ -21,20 +25,46 @@ def export_to_huggingface_hub(
     huggingface_repo_name: str,
     export_vespa_onnx: bool = False,
 ):
+    print(f"Loading model located at {colbert_path}")
     colbert_config = ColBERTConfig.load_from_checkpoint(colbert_path)
     assert colbert_config is not None
     colbert_model = ColBERT(
         colbert_path,
         colbert_config=colbert_config,
     )
+    tmp_export_path = ".tmp/hugging_face_export"
+    print(f"Model loaded... saving export files to disk at {tmp_export_path}")
     try:
         save_model = colbert_model.save
     except Exception:
         save_model = colbert_model.module.save
-    save_model(".tmp/hugging_face_export")
-    # TODO
+    save_model(tmp_export_path)
     if export_vespa_onnx:
-        export_to_vespa_onnx(colbert_path, out_path=".tmp/hugging_face_export")
+        print("Generating Vespa ONNX model...")
+        export_to_vespa_onnx(colbert_path, out_path=tmp_export_path)
+    try:
+        api = HfApi()
+        api.create_repo(repo_id=huggingface_repo_name, repo_type="model", exist_ok=True)
+        api.upload_folder(
+            folder_path=tmp_export_path,
+            repo_id=huggingface_repo_name,
+            repo_type="model",
+        )
+        print(f"Successfully uploaded model to {huggingface_repo_name}")
+    except ValueError as e:
+        print(
+            f"Could not create repository on the huggingface hub.\n",
+            f"Error: {e}\n",
+            "Please make sure you are logged in (run huggingface-cli login)\n",
+            "If the error persists, please open an issue on github. This is a beta feature!",
+        )
+    except HfHubHTTPError:
+        print(
+            "You don't seem to have the rights to create a repository with this name...\n",
+            "Please make sure your repo name is in the format 'yourusername/your-repo-name'",
+        )
+    finally:
+        shutil.rmtree(tmp_export_path)
 
 
 """ VESPA """
@@ -67,7 +97,7 @@ def export_to_vespa_onnx(
     torch.onnx.export(
         vespa_colbert,
         args=args,
-        f=str(out_path / "model.onnx"),
+        f=str(out_path / "vespa_colbert.onnx"),
         input_names=input_names,
         output_names=output_names,
         dynamic_axes={
