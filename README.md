@@ -84,17 +84,20 @@ Training and Fine-Tuning follow the exact same process. When you instantiate `RA
 
 ```python
 from ragatouille import RAGTrainer
+from ragatouille.utils import get_wikipedia_page
 
 pairs = [
     ("What is the meaning of life ?", "The meaning of life is 42"),
     ("What is Neural Search?", "Neural Search is a terms referring to a family of ..."),
+    # You need many more pairs to train! Check the examples for more details!
     ...
 ]
 
-my_full_corpus = ["Any document that you have in your data that isn't necessarily tied to a query", "Another document", ...]
+my_full_corpus = [get_wikipedia_page("Hayao_Miyazaki"), get_wikipedia_page("Studio_Ghibli")]
+
 
 trainer = RAGTrainer(model_name = "MyFineTunedColBERT",
-        pretrained_model_name = "colbert-ir/colbert-v2.0") # In this example, we run fine-tuning
+        pretrained_model_name = "colbert-ir/colbertv2.0") # In this example, we run fine-tuning
 
 # This step handles all the data processing, check the examples for more details!
 trainer.prepare_training_data(raw_data=pairs,
@@ -113,9 +116,10 @@ To create an index, you'll need to load a trained model, this can be one of your
 
 ```python
 from ragatouille import RAGPretrainedModel
+from ragatouille.utils import get_wikipedia_page
 
 RAG = RAGPretrainedModel.from_pretrained("colbert-ir/colbertv2.0")
-my_documents = ["This is a great excerpt from my wealth of documents", "Once upon a time, there was a great document", ...]
+my_documents = [get_wikipedia_page("Hayao_Miyazaki"), get_wikipedia_page("Studio_Ghibli")]
 index_path = RAG.index(index_name="my_index", collection=my_documents)
 ```
 
@@ -146,18 +150,18 @@ However, if you'd rather do it yourself or want to use a slightly different conf
 ```python
 from ragatouille import RAGPretrainedModel
 
-query = "ColBERT my dear ColBERT, who is the fairest document of them all?"
-RAG = RAGPretrainedModel.from_pretrained("colbert-ir/colbert-v2.0")
-results = RAG.search(query, index_name="my_fancy_index")
+query = "What manga did Hayao Miyazaki write?"
+RAG = RAGPretrainedModel.from_pretrained("colbert-ir/colbertv2.0")
+results = RAG.search(query, index_name="my_index")
 ```
 
 `RAG.search` is a flexible method! You can set the `k` value to however many results you want (it defaults to `10`), and you can also use it to search for multiple queries at once:
 
 ```python
-RAG.search(["What is the meaning of life ?",
-"What is the best film ever made?",
-"Can you really answer these questions with Neural Search?"],
-index_name="my_fancy_index")
+RAG.search(["What manga did Hayao Miyazaki write?",
+"Who are the founders of Ghibli?"
+"Who is the director of Spirited Away?"],
+index_name="my_index")
 ```
 
 `RAG.search` returns results in the form of a list of dictionaries, or a list of list of dictionaries if you used multiple queries: 
