@@ -1,5 +1,10 @@
-from typing import Callable, Optional, Union
+from typing import Callable, Optional, Union, List, Any
 from pathlib import Path
+from langchain_core.retrievers import BaseRetriever
+from langchain_core.documents import Document
+from langchain_core.callbacks.manager import (
+    CallbackManagerForRetrieverRun,
+)
 from ragatouille.data.corpus_processor import CorpusProcessor
 from ragatouille.data.preprocessors import llama_index_sentence_splitter
 from ragatouille.models import LateInteractionModel, ColBERT
@@ -184,3 +189,19 @@ class RAGPretrainedModel:
             zero_index_ranks=zero_index_ranks,
             **kwargs,
         )
+
+    def as_langchain_retriever(self, **kwargs: Any) -> BaseRetriever:
+        return RAGatouilleLangChainRetriever(model=self, kwargs=kwargs)
+
+
+class RAGatouilleLangChainRetriever(BaseRetriever):
+
+    model: RAGPretrainedModel
+    kwargs: dict = {}
+
+    def _get_relevant_documents(
+            self, query: str, *, run_manager: CallbackManagerForRetrieverRun
+    ) -> List[Document]:
+        """Get documents relevant to a query."""
+        docs = self.model.search(query, **self.kwargs)
+        return [Document(page_content=doc['content']) for doc in docs]
