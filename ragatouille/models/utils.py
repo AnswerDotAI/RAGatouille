@@ -24,29 +24,33 @@ def export_to_huggingface_hub(
     colbert_path: str | Path,
     huggingface_repo_name: str,
     export_vespa_onnx: bool = False,
+    use_tmp_dir: bool = False,
 ):
+    export_path = colbert_path
+    if use_tmp_dir:
+        export_path = ".tmp/hugging_face_export"
+        print("Using tmp dir to store export files...")
     print(f"Loading model located at {colbert_path}")
+
     colbert_config = ColBERTConfig.load_from_checkpoint(colbert_path)
     assert colbert_config is not None
     colbert_model = ColBERT(
         colbert_path,
         colbert_config=colbert_config,
     )
-    tmp_export_path = ".tmp/hugging_face_export"
-    print(f"Model loaded... saving export files to disk at {tmp_export_path}")
+    print(f"Model loaded... saving export files to disk at {export_path}")
     try:
         save_model = colbert_model.save
     except Exception:
         save_model = colbert_model.module.save
-    save_model(tmp_export_path)
+    save_model(export_path)
     if export_vespa_onnx:
-        print("Generating Vespa ONNX model...")
-        export_to_vespa_onnx(colbert_path, out_path=tmp_export_path)
+        export_to_vespa_onnx(colbert_path, out_path=export_path)
     try:
         api = HfApi()
         api.create_repo(repo_id=huggingface_repo_name, repo_type="model", exist_ok=True)
         api.upload_folder(
-            folder_path=tmp_export_path,
+            folder_path=export_path,
             repo_id=huggingface_repo_name,
             repo_type="model",
         )
@@ -64,7 +68,8 @@ def export_to_huggingface_hub(
             "Please make sure your repo name is in the format 'yourusername/your-repo-name'",
         )
     finally:
-        shutil.rmtree(tmp_export_path)
+        if use_tmp_dir:
+            shutil.rmtree(export_path)
 
 
 """ VESPA """
@@ -86,6 +91,7 @@ class VespaColBERT(BertPreTrainedModel):
 def export_to_vespa_onnx(
     colbert_path: str | Path,
     out_path: str | Path,
+    out_file_name: str = "vespa_colbert.onnx",
 ):
     out_path = Path(out_path)
     vespa_colbert = VespaColBERT.from_pretrained(colbert_path, dim=128)
@@ -97,7 +103,7 @@ def export_to_vespa_onnx(
     torch.onnx.export(
         vespa_colbert,
         args=args,
-        f=str(out_path / "vespa_colbert.onnx"),
+        f=str(out_path / out_file_name),
         input_names=input_names,
         output_names=output_names,
         dynamic_axes={
