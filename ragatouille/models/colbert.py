@@ -188,7 +188,7 @@ class ColBERT(LateInteractionModel):
                     f"New index_name received!",
                     f"Updating current index_name ({self.index_name}) to {index_name}",
                 )
-            self.index_name = self.index_name
+            self.index_name = index_name
         else:
             if self.index_name is None:
                 print(
