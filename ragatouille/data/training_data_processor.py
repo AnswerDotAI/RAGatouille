@@ -89,7 +89,7 @@ class TrainingDataProcessor:
         else:
             p = self.passage_map[positives[0]]
             for n in negatives:
-                triplets.append([q, p, n])
+                triplets.append([q, p, self.passage_map[n]])
 
         return triplets
 
