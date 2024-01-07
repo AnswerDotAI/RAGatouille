@@ -117,9 +117,13 @@ To create an index, you'll need to load a trained model, this can be one of your
 ```python
 from ragatouille import RAGPretrainedModel
 from ragatouille.utils import get_wikipedia_page
+from ragatouille.data import CorpusProcessor
+
 
 RAG = RAGPretrainedModel.from_pretrained("colbert-ir/colbertv2.0")
 my_documents = [get_wikipedia_page("Hayao_Miyazaki"), get_wikipedia_page("Studio_Ghibli")]
+processor = CorpusProcessor()
+my_documents = processor.process_corpus(my_documents)
 index_path = RAG.index(index_name="my_index", collection=my_documents)
 ```
 

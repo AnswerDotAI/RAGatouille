@@ -1,9 +1,12 @@
-from typing import Union, Optional
+import math
+from typing import Union, Optional, Literal
 from pathlib import Path
 from colbert.infra import Run, ColBERTConfig, RunConfig
 from colbert import Indexer, Searcher, Trainer, IndexUpdater
+from colbert.modeling.checkpoint import Checkpoint
 import torch
 import srsly
+import numpy as np
 
 from ragatouille.models.base import LateInteractionModel
 
@@ -50,6 +53,10 @@ class ColBERT(LateInteractionModel):
             )
             self.checkpoint = pretrained_model_name_or_path
             self.index_name = index_name
+        self.config.experiment = "colbert"
+        self.config.root = ".ragatouille/"
+
+        self.inference_ckpt = Checkpoint(self.checkpoint, colbert_config=self.config)
 
         self.run_context = Run().context(self.run_config)
         self.run_context.__enter__()  # Manually enter the context
@@ -285,6 +292,111 @@ class ColBERT(LateInteractionModel):
             )
 
             trainer.train(checkpoint=self.checkpoint)
+
+    def _colbert_score(self, Q, D_padded, D_mask):
+        if ColBERTConfig().total_visible_gpus > 0:
+            Q, D_padded, D_mask = Q.cuda(), D_padded.cuda(), D_mask.cuda()
+
+        assert Q.dim() == 3, Q.size()
+        assert D_padded.dim() == 3, D_padded.size()
+        assert Q.size(0) in [1, D_padded.size(0)]
+
+        scores = D_padded @ Q.to(dtype=D_padded.dtype).permute(0, 2, 1)
+        scores = scores.max(1).values
+        return scores.sum(-1)
+
+    def _index_free_retrieve(
+        self,
+        query: str | list[str],
+        documents: list[str],
+        k: int,
+        max_tokens: Literal["auto"] | int = "auto",
+        zero_index: bool = False,
+        bsize: int = 32,
+    ):
+        if max_tokens == "auto" or max_tokens > 512:
+            max_tokens = 512
+            percentile_80 = np.percentile([len(x.split(" ")) for x in documents], 80)
+            max_tokens = min(
+                math.ceil((percentile_80 * 1.35) / 32) * 32,
+                512,
+            )
+            if max_tokens > 288:
+                print(
+                    f"Your documents are roughly {percentile_80} tokens long at the 80th percentile!",
+                    "This is quite long and might slow down reranking!\n",
+                    "Provide fewer documents, build smaller chunks or run on GPU",
+                    "if it takes too long for your needs!",
+                )
+
+        self.inference_ckpt.colbert_config.max_doclen = max_tokens
+        self.inference_ckpt.doc_tokenizer.doc_maxlen = max_tokens
+
+        if k > len(documents):
+            print("k value cannot be larger than the number of documents! aborting...")
+            return None
+        if len(documents) > 1000:
+            print(
+                "Please note ranking in-memory is not optimised for large document counts! ",
+                "Consider building an index and using search instead!",
+            )
+        if len(set(documents)) != len(documents):
+            print(
+                "WARNING! Your documents have duplicate entries! ",
+                "This will slow down calculation and may yield subpar results",
+            )
+
+        embedded_queries = self._encode_index_free_queries(query, bsize=bsize)
+        embedded_docs, doc_mask = self._encode_index_free_documents(
+            documents, bsize=bsize
+        )
+        results = []
+
+        for query in embedded_queries:
+            results_for_query = []
+            scores = self._colbert_score(query, embedded_docs, doc_mask)
+            sorted_scores = sorted(enumerate(scores), key=lambda x: x[1], reverse=True)
+            high_score_idxes = [index for index, _ in sorted_scores[:k]]
+            for rank, doc_idx in enumerate(high_score_idxes):
+                result = {
+                    "content": documents[doc_idx],
+                    "score": float(scores[doc_idx]),
+                    "rank": rank - 1 if zero_index else rank,
+                    "result_index": doc_idx,
+                }
+                results_for_query.append(result)
+            results.append(results_for_query)
+
+        if len(results) == 1:
+            return results[0]
+
+        return results
+
+    def _encode_index_free_queries(self, queries: str | list[str], bsize: int = 32):
+        if isinstance(queries, str):
+            queries = [queries]
+        embedded_queries = [
+            x.unsqueeze(0)
+            for x in self.inference_ckpt.queryFromText(queries, bsize=bsize)
+        ]
+        return embedded_queries
+
+    def _encode_index_free_documents(self, documents: list[str], bsize: int = 32):
+        embedded_docs = self.inference_ckpt.docFromText(documents, bsize=bsize)[0]
+        doc_mask = torch.full(embedded_docs.shape[:2], -float("inf"))
+        return embedded_docs, doc_mask
+
+    def rank(
+        self,
+        query: str,
+        documents: list[str],
+        k: int = 10,
+        zero_index_ranks: bool = False,
+        bsize: int = 32,
+    ):
+        return self._index_free_retrieve(
+            query, documents, k, zero_index=zero_index_ranks, bsize=bsize
+        )
 
     def __del__(self):
         # Clean up context
