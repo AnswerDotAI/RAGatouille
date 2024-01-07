@@ -1,3 +1,4 @@
+import os
 from typing import Union, Optional
 from pathlib import Path
 from colbert.infra import Run, ColBERTConfig, RunConfig
