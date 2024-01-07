@@ -1,3 +1,4 @@
+import os
 import random
 import shutil
 from pathlib import Path
@@ -49,6 +50,25 @@ def export_to_huggingface_hub(
         save_model(export_path)
 
     if export_vespa_onnx:
+        rust_tokenizer_available = True
+        if use_tmp_dir:
+            try:
+                colbert_model.raw_tokenizer.save_pretrained(
+                    export_path, legacy_format=False
+                )
+            except Exception:
+                rust_tokenizer_available = False
+        else:
+            rust_tokenizer_available = os.path.exists(
+                Path(colbert_path) / "tokenizer.json"
+            )
+        if not rust_tokenizer_available:
+            print(
+                "The tokenizer for your model does not seem to have a Fast Tokenizer implementation...\n",
+                "This may cause problems when trying to use with Vespa!\n",
+                "Proceeding anyway...",
+            )
+
         export_to_vespa_onnx(colbert_path, out_path=export_path)
     try:
         api = HfApi()
@@ -97,8 +117,10 @@ def export_to_vespa_onnx(
     out_path: str | Path,
     out_file_name: str = "vespa_colbert.onnx",
 ):
+    print(f"Exporting model {colbert_path} to {out_path}/{out_file_name}")
     out_path = Path(out_path)
     vespa_colbert = VespaColBERT.from_pretrained(colbert_path, dim=128)
+    print("Model loaded, converting to ONNX...")
     input_names = ["input_ids", "attention_mask"]
     output_names = ["contextual"]
     input_ids = torch.ones(1, 32, dtype=torch.int64)
@@ -117,3 +139,4 @@ def export_to_vespa_onnx(
         },
         opset_version=17,
     )
+    print("Vespa ONNX export complete!")
