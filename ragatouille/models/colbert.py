@@ -24,6 +24,7 @@ class ColBERT(LateInteractionModel):
     ):
         self.verbose = verbose
         self.collection = None
+        self.in_memory_docs = []
         if n_gpu == -1:
             n_gpu = 1 if torch.cuda.device_count() == 0 else torch.cuda.device_count()
 
@@ -306,6 +307,37 @@ class ColBERT(LateInteractionModel):
         scores = scores.max(1).values
         return scores.sum(-1)
 
+    def _index_free_search(
+        self,
+        embedded_queries,
+        documents: list[str],
+        embedded_docs,
+        doc_mask,
+        k: int = 10,
+        zero_index: bool = False,
+    ):
+        results = []
+
+        for query in embedded_queries:
+            results_for_query = []
+            scores = self._colbert_score(query, embedded_docs, doc_mask)
+            sorted_scores = sorted(enumerate(scores), key=lambda x: x[1], reverse=True)
+            high_score_idxes = [index for index, _ in sorted_scores[:k]]
+            for rank, doc_idx in enumerate(high_score_idxes):
+                result = {
+                    "content": documents[doc_idx],
+                    "score": float(scores[doc_idx]),
+                    "rank": rank - 1 if zero_index else rank,
+                    "result_index": doc_idx,
+                }
+                results_for_query.append(result)
+            results.append(results_for_query)
+
+        if len(results) == 1:
+            return results[0]
+
+        return results
+
     def _index_free_retrieve(
         self,
         query: str | list[str],
@@ -351,27 +383,15 @@ class ColBERT(LateInteractionModel):
         embedded_docs, doc_mask = self._encode_index_free_documents(
             documents, bsize=bsize
         )
-        results = []
 
-        for query in embedded_queries:
-            results_for_query = []
-            scores = self._colbert_score(query, embedded_docs, doc_mask)
-            sorted_scores = sorted(enumerate(scores), key=lambda x: x[1], reverse=True)
-            high_score_idxes = [index for index, _ in sorted_scores[:k]]
-            for rank, doc_idx in enumerate(high_score_idxes):
-                result = {
-                    "content": documents[doc_idx],
-                    "score": float(scores[doc_idx]),
-                    "rank": rank - 1 if zero_index else rank,
-                    "result_index": doc_idx,
-                }
-                results_for_query.append(result)
-            results.append(results_for_query)
-
-        if len(results) == 1:
-            return results[0]
-
-        return results
+        return self._index_free_search(
+            embedded_queries=embedded_queries,
+            documents=documents,
+            embedded_docs=embedded_docs,
+            doc_mask=doc_mask,
+            k=k,
+            zero_index=zero_index,
+        )
 
     def _encode_index_free_queries(self, queries: str | list[str], bsize: int = 32):
         if isinstance(queries, str):
@@ -397,6 +417,24 @@ class ColBERT(LateInteractionModel):
     ):
         return self._index_free_retrieve(
             query, documents, k, zero_index=zero_index_ranks, bsize=bsize
+        )
+
+    def encode_index_free_documents(self, documents: list[str], bsize: int = 32):
+        # TODO: Add support for adding extra documents, not just replacing.
+        self.in_memory_collection = documents
+        self.in_memory_embed_docs, self.doc_masks = self._encode_index_free_documents(
+            documents, bsize=bsize
+        )
+
+    def search_in_memory(self, queries: str | list[str], bsize: int = 32):
+        queries = self._encode_index_free_queries(queries, bsize=bsize)
+        return self._index_free_search(
+            embedded_queries=queries,
+            documents=self.in_memory_collection,
+            embedded_docs=self.in_memory_embed_docs,
+            doc_mask=self.doc_masks,
+            k=10,
+            zero_index=False,
         )
 
     def __del__(self):

@@ -191,39 +191,6 @@ class RAGPretrainedModel:
             **kwargs,
         )
 
-    def direct_search(
-        self,
-        query: str | list[str],
-        documents: list[str],
-        k: int = 10,
-        zero_index_ranks: bool = False,
-        bsize: int = 64,
-    ) -> Union[list[dict], list[list[dict]]]:
-        """Directly search for relevant results in a list of documents without building an index. Functionally equivalent to `rerank()`.
-
-        Parameters:
-            query (Union[str, list[str]]): The query or list of queries to search for.
-            k (int): The number of results to return for each query.
-            zero_index_ranks (bool): Whether to zero the index ranks of the results. By default, result rank 1 is the highest ranked result
-            bsize (int): The batch size to use for re-ranking.
-
-
-        Returns:
-            results (Union[list[dict], list[list[dict]]]): A list of dict containing individual results for each query. If a list of queries is provided, returns a list of lists of dicts. Each result is a dict with keys `content`, `score` and `rank`.
-
-        Individual results are always in the format:
-        ```python3
-        {"content": "text of the relevant passage", "score": 0.123456, "rank": 1}
-        ```
-        """
-        return self.model.rank(
-            query=query,
-            documents=documents,
-            k=k,
-            zero_index_ranks=zero_index_ranks,
-            bsize=bsize,
-        )
-
     def rerank(
         self,
         query: str | list[str],
