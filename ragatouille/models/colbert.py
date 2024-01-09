@@ -1,4 +1,5 @@
 import os
+import time
 from typing import Union, Optional
 from pathlib import Path
 from colbert.infra import Run, ColBERTConfig, RunConfig
@@ -145,6 +146,8 @@ class ColBERT(LateInteractionModel):
                     "pip uninstall --y faiss-cpu & pip install faiss-gpu\n",
                     "________________________________________________________________________________",
                 )
+                print("Will continue with CPU indexing in 5 seconds...")
+                time.sleep(5)
         self.config.doc_maxlen = max_document_length
         if index_name is not None:
             if self.index_name is not None:
