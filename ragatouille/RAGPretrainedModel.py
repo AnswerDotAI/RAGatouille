@@ -8,7 +8,7 @@ from langchain_core.callbacks.manager import (
 from ragatouille.data.corpus_processor import CorpusProcessor
 from ragatouille.data.preprocessors import llama_index_sentence_splitter
 from ragatouille.models import LateInteractionModel, ColBERT
-
+from uuid import uuid4
 
 class RAGPretrainedModel:
     """
@@ -90,6 +90,8 @@ class RAGPretrainedModel:
     def index(
         self,
         collection: list[str],
+        document_ids: Optional[list[str]] = None,
+        document_metadata: Optional[list[dict]] = None,
         index_name: str = None,
         overwrite_index: bool = True,
         max_document_length: int = 256,
@@ -101,26 +103,43 @@ class RAGPretrainedModel:
 
         Parameters:
             collection (list[str]): The collection of documents to index.
+            document_ids (Optional[list[str]]): An optional list of document ids. Ids will be generated at index time if not supplied.
+            metadata (Optional[list[dict]]): An optional list of metadata dicts
             index_name (str): The name of the index that will be built.
             overwrite_index (bool): Whether to overwrite an existing index with the same name.
 
         Returns:
             index (str): The path to the index that was built.
         """
+
+        if document_ids is None:
+            document_ids = [str(uuid4()) for x in range(len(collection))]
+
+        if len(document_ids) != len(collection):
+            raise ValueError("Supplied document ids and collection must be the same length.")
+
         if split_documents or preprocessing_fn is not None:
             self.corpus_processor = CorpusProcessor(
                 document_splitter_fn=document_splitter_fn if split_documents else None,
                 preprocessing_fn=preprocessing_fn,
             )
-            collection = self.corpus_processor.process_corpus(
+            collection_with_ids = self.corpus_processor.process_corpus(
                 collection,
+                document_ids,
                 chunk_size=max_document_length,
             )
+        else:
+            collection_with_ids = [{"document_id": x, "content": y} for x, y in zip(document_ids, collection)]
+        
+        if document_metadata is not None:
+            document_metadata_with_ids = {x:y for x, y in zip(document_ids, document_metadata)}
+        
         overwrite = "reuse"
         if overwrite_index:
             overwrite = True
         return self.model.index(
-            collection,
+            collection_with_ids,
+            document_metadata_with_ids,
             index_name,
             max_document_length=max_document_length,
             overwrite=overwrite,
@@ -129,6 +148,7 @@ class RAGPretrainedModel:
     def add_to_index(
         self,
         new_documents: list[str],
+        new_metadata: Optional[list[dict]] = None,
         index_name: Optional[str] = None,
         split_documents: bool = True,
         document_splitter_fn: Optional[Callable] = llama_index_sentence_splitter,
@@ -152,6 +172,7 @@ class RAGPretrainedModel:
 
         self.model.add_to_index(
             new_documents,
+            new_metadata,
             index_name=index_name,
         )
 

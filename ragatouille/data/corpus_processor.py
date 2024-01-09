@@ -14,15 +14,16 @@ class CorpusProcessor:
     def process_corpus(
         self,
         documents: list[str],
+        document_ids: list[str],
         **splitter_kwargs,
     ) -> list[str]:
         # TODO CHECK KWARGS
         if self.document_splitter_fn is not None:
-            documents = self.document_splitter_fn(documents, **splitter_kwargs)
+            documents = self.document_splitter_fn(documents, document_ids, **splitter_kwargs)
         if self.preprocessing_fn is not None:
             if isinstance(self.preprocessing_fn, list):
                 for fn in self.preprocessing_fn:
-                    documents = fn(documents)
+                    documents = fn(documents, document_ids)
                 return documents
-            return self.preprocessing_fn(documents)
+            return self.preprocessing_fn(documents, document_ids)
         return documents
