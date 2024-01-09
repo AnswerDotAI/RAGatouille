@@ -1,5 +1,6 @@
 import math
 from typing import Union, Optional, Literal
+import os
 from pathlib import Path
 from colbert.infra import Run, ColBERTConfig, RunConfig
 from colbert import Indexer, Searcher, Trainer, IndexUpdater
@@ -195,7 +196,7 @@ class ColBERT(LateInteractionModel):
                     f"New index_name received!",
                     f"Updating current index_name ({self.index_name}) to {index_name}",
                 )
-            self.index_name = self.index_name
+            self.index_name = index_name
         else:
             if self.index_name is None:
                 print(
