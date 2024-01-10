@@ -34,7 +34,6 @@ class RAGatouilleLangChainCompressor(BaseDocumentCompressor):
         self,
         documents: Sequence[Document],
         query: str,
-        k: int = 5,
         callbacks: Optional[Callbacks] = None,
         **kwargs,
     ) -> Any:
