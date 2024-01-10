@@ -193,16 +193,17 @@ class RAGPretrainedModel:
 
     def rerank(
         self,
-        query: str | list[str],
+        query: Union[str, list[str]],
         documents: list[str],
         k: int = 10,
         zero_index_ranks: bool = False,
         bsize: int = 64,
     ):
-        """Re-rank documents via ColBERT. Functionally equivalent to `direct_search()`.
+        """Encode documents and rerank them in-memory. Performance degrades rapidly with more documents.
 
         Parameters:
             query (Union[str, list[str]]): The query or list of queries to search for.
+            documents (list[str]): The documents to rerank.
             k (int): The number of results to return for each query.
             zero_index_ranks (bool): Whether to zero the index ranks of the results. By default, result rank 1 is the highest ranked result
             bsize (int): The batch size to use for re-ranking.

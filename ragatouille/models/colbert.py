@@ -340,10 +340,10 @@ class ColBERT(LateInteractionModel):
 
     def _index_free_retrieve(
         self,
-        query: str | list[str],
+        query: Union[str, list[str]],
         documents: list[str],
         k: int,
-        max_tokens: Literal["auto"] | int = "auto",
+        max_tokens: Union[Literal["auto"], int] = "auto",
         zero_index: bool = False,
         bsize: int = 32,
     ):
@@ -393,7 +393,9 @@ class ColBERT(LateInteractionModel):
             zero_index=zero_index,
         )
 
-    def _encode_index_free_queries(self, queries: str | list[str], bsize: int = 32):
+    def _encode_index_free_queries(
+        self, queries: Union[str, list[str]], bsize: int = 32
+    ):
         if isinstance(queries, str):
             queries = [queries]
         embedded_queries = [
@@ -420,13 +422,17 @@ class ColBERT(LateInteractionModel):
         )
 
     def encode_index_free_documents(self, documents: list[str], bsize: int = 32):
+        raise NotImplementedError(
+            "encode_index_free_documents is not yet fully implemented"
+        )
         # TODO: Add support for adding extra documents, not just replacing.
         self.in_memory_collection = documents
         self.in_memory_embed_docs, self.doc_masks = self._encode_index_free_documents(
             documents, bsize=bsize
         )
 
-    def search_in_memory(self, queries: str | list[str], bsize: int = 32):
+    def search_in_memory(self, queries: Union[str, list[str]], bsize: int = 32):
+        raise NotImplementedError("search_in_memory is not yet fully implemented")
         queries = self._encode_index_free_queries(queries, bsize=bsize)
         return self._index_free_search(
             embedded_queries=queries,
