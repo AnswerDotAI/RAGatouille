@@ -23,6 +23,7 @@ class RAGatouilleLangChainRetriever(BaseRetriever):
 class RAGatouilleLangChainCompressor(BaseDocumentCompressor):
     model: Any
     kwargs: dict = {}
+    k: int = 5
 
     class Config:
         """Configuration for this pydantic object."""
@@ -43,7 +44,7 @@ class RAGatouilleLangChainCompressor(BaseDocumentCompressor):
         results = self.model.rerank(
             query=query,
             documents=_docs,
-            k=k,
+            k=kwargs.get("k", self.k),
             **self.kwargs,
         )
         final_results = []
