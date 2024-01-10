@@ -228,5 +228,7 @@ class RAGPretrainedModel:
     def as_langchain_retriever(self, **kwargs: Any) -> BaseRetriever:
         return RAGatouilleLangChainRetriever(model=self, kwargs=kwargs)
 
-    def as_langchain_document_compressor(self, **kwargs: Any) -> BaseDocumentCompressor:
-        return RAGatouilleLangChainCompressor(model=self, kwargs=kwargs)
+    def as_langchain_document_compressor(
+        self, k: int = 5, **kwargs: Any
+    ) -> BaseDocumentCompressor:
+        return RAGatouilleLangChainCompressor(model=self, k=k, kwargs=kwargs)
