@@ -2,6 +2,7 @@ import os
 import random
 import shutil
 from pathlib import Path
+from typing import Union
 
 import torch
 import torch.nn as nn
@@ -22,7 +23,7 @@ def seeded_shuffle(collection: list, seed: int = 42):
 
 
 def export_to_huggingface_hub(
-    colbert_path: str | Path,
+    colbert_path: Union[str, Path],
     huggingface_repo_name: str,
     export_vespa_onnx: bool = False,
     use_tmp_dir: bool = False,
@@ -113,8 +114,8 @@ class VespaColBERT(BertPreTrainedModel):
 
 
 def export_to_vespa_onnx(
-    colbert_path: str | Path,
-    out_path: str | Path,
+    colbert_path: Union[str, Path],
+    out_path: Union[str, Path],
     out_file_name: str = "vespa_colbert.onnx",
 ):
     print(f"Exporting model {colbert_path} to {out_path}/{out_file_name}")
