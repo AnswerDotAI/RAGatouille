@@ -37,3 +37,7 @@ class LateInteractionModel(ABC):
     @abstractmethod
     def _batch_search(self, name: str, queries: list[str]):
         ...
+
+    @abstractmethod
+    def rank(self, query: str, documents: list[str], k: int):
+        ...
