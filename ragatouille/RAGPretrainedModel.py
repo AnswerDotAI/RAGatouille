@@ -126,6 +126,9 @@ class RAGPretrainedModel:
 
         if len(set(document_ids)) != len(document_ids):
             raise ValueError("Document IDs must be unique.")
+        
+        if document_metadatas is not None and len(document_metadatas) != len(documents):
+            raise ValueError("Document metadata and documents must be the same length.")
 
         if split_documents or preprocessing_fn is not None:
             self.corpus_processor = CorpusProcessor(
