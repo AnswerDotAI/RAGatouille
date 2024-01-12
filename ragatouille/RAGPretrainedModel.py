@@ -8,7 +8,7 @@ from langchain_core.callbacks.manager import (
 from ragatouille.data.corpus_processor import CorpusProcessor
 from ragatouille.data.preprocessors import llama_index_sentence_splitter
 from ragatouille.models import LateInteractionModel, ColBERT
-from uuid import uuid4
+
 
 class RAGPretrainedModel:
     """
@@ -50,7 +50,7 @@ class RAGPretrainedModel:
         pretrained_model_name_or_path: Union[str, Path],
         n_gpu: int = -1,
         verbose: int = 1,
-        index_root: Optional[str] = None
+        index_root: Optional[str] = None,
     ):
         """Load a ColBERT model from a pre-trained checkpoint.
 
@@ -58,12 +58,15 @@ class RAGPretrainedModel:
             pretrained_model_name_or_path (str): Local path or huggingface model name.
             n_gpu (int): Number of GPUs to use. By default, value is -1, which means use all available GPUs or none if no GPU is available.
             verbose (int): The level of ColBERT verbosity requested. By default, 1, which will filter out most internal logs.
+            index_root (Optional[str]): The root directory where indexes will be stored. If None, will use the default directory, '.ragatouille/'.
 
         Returns:
             cls (RAGPretrainedModel): The current instance of RAGPretrainedModel, with the model initialised.
         """
         instance = cls()
-        instance.model = ColBERT(pretrained_model_name_or_path, n_gpu, index_root=index_root, verbose=verbose)
+        instance.model = ColBERT(
+            pretrained_model_name_or_path, n_gpu, index_root=index_root, verbose=verbose
+        )
         return instance
 
     @classmethod
@@ -105,9 +108,13 @@ class RAGPretrainedModel:
         Parameters:
             documents (list[str]): The list of documents to index.
             document_ids (Optional[list[str]]): An optional list of document ids. Ids will be generated at index time if not supplied.
-            metadata (Optional[list[dict]]): An optional list of metadata dicts
+            document_metadatas (Optional[list[dict]]): An optional list of metadata dicts
             index_name (str): The name of the index that will be built.
             overwrite_index (bool): Whether to overwrite an existing index with the same name.
+            max_document_length (int): The maximum length of a document. Documents longer than this will be split into chunks.
+            split_documents (bool): Whether to split documents into chunks.
+            document_splitter_fn (Optional[Callable]): A function to split documents into chunks. If None and by default, will use the llama_index_sentence_splitter.
+            preprocessing_fn (Optional[Union[Callable, list[Callable]]]): A function or list of functions to preprocess documents. If None and by default, will not preprocess documents.
 
         Returns:
             index (str): The path to the index that was built.
@@ -115,7 +122,7 @@ class RAGPretrainedModel:
 
         if len(document_ids) != len(documents):
             raise ValueError("Document IDs and documents must be the same length.")
-        
+
         if len(set(document_ids)) != len(document_ids):
             raise ValueError("Document IDs must be unique.")
 
@@ -130,13 +137,18 @@ class RAGPretrainedModel:
                 chunk_size=max_document_length,
             )
         else:
-            collection_with_ids = [{"document_id": x, "content": y} for x, y in zip(document_ids, documents)]
-        
+            collection_with_ids = [
+                {"document_id": x, "content": y}
+                for x, y in zip(document_ids, documents)
+            ]
+
         if document_metadatas is not None:
-            document_metadata_dict = {x:y for x, y in zip(document_ids, document_metadatas)}
+            document_metadata_dict = {
+                x: y for x, y in zip(document_ids, document_metadatas)
+            }
         else:
             document_metadata_dict = None
-        
+
         overwrite = "reuse"
         if overwrite_index:
             overwrite = True
@@ -162,16 +174,17 @@ class RAGPretrainedModel:
 
         Parameters:
             new_documents (list[str]): The documents to add to the index.
+            new_document_ids (Union[TypeVar("T"), List[TypeVar("T")]]): The IDs of the documents to add to the index.
+            new_document_metadatas (Optional[list[dict]]): An optional list of metadata dicts
             index_name (Optional[str]): The name of the index to add documents to. If None and by default, will add documents to the already initialised one.
         """
 
         if len(new_document_ids) != len(new_documents):
             raise ValueError("Document IDs and documents must be the same length.")
-        
+
         if len(set(new_document_ids)) != len(new_document_ids):
             raise ValueError("New document IDs must be unique.")
-        
-        
+
         if split_documents or preprocessing_fn is not None:
             self.corpus_processor = CorpusProcessor(
                 document_splitter_fn=document_splitter_fn if split_documents else None,
@@ -183,10 +196,15 @@ class RAGPretrainedModel:
                 chunk_size=self.model.config.doc_maxlen,
             )
         else:
-            new_documents_with_ids = [{"document_id": x, "content": y} for x, y in zip(new_document_ids, new_documents)]
+            new_documents_with_ids = [
+                {"document_id": x, "content": y}
+                for x, y in zip(new_document_ids, new_documents)
+            ]
 
         if new_document_metadatas is not None:
-            new_document_metadata_dict = {x:y for x, y in zip(new_document_ids, new_document_metadatas)}
+            new_document_metadata_dict = {
+                x: y for x, y in zip(new_document_ids, new_document_metadatas)
+            }
         else:
             new_document_metadata_dict = None
 
@@ -231,12 +249,17 @@ class RAGPretrainedModel:
             zero_index_ranks (bool): Whether to zero the index ranks of the results. By default, result rank 1 is the highest ranked result
 
         Returns:
-            results (Union[list[dict], list[list[dict]]]): A list of dict containing individual results for each query. If a list of queries is provided, returns a list of lists of dicts. Each result is a dict with keys `content`, `score` and `rank`.
+            results (Union[list[dict], list[list[dict]]]): A list of dict containing individual results for each query. If a list of queries is provided, returns a list of lists of dicts. Each result is a dict with keys `content`, `score`, `rank`, and 'document_id'. If metadata was indexed for the document, it will be returned under the "document_metadata" key.
 
         Individual results are always in the format:
         ```python3
-        {"content": "text of the relevant passage", "score": 0.123456, "rank": 1}
+        {"content": "text of the relevant passage", "score": 0.123456, "rank": 1, "document_id": "x"}
         ```
+        or
+        ```python3
+        {"content": "text of the relevant passage", "score": 0.123456, "rank": 1, "document_id": "x", "document_metadata": {"metadata_key": "metadata_value", ...}}
+        ```
+
         """
         return self.model.search(
             query=query,
@@ -252,13 +275,12 @@ class RAGPretrainedModel:
 
 
 class RAGatouilleLangChainRetriever(BaseRetriever):
-
     model: RAGPretrainedModel
     kwargs: dict = {}
 
     def _get_relevant_documents(
-            self, query: str, *, run_manager: CallbackManagerForRetrieverRun
+        self, query: str, *, run_manager: CallbackManagerForRetrieverRun
     ) -> List[Document]:
         """Get documents relevant to a query."""
         docs = self.model.search(query, **self.kwargs)
-        return [Document(page_content=doc['content']) for doc in docs]
+        return [Document(page_content=doc["content"]) for doc in docs]

@@ -122,9 +122,10 @@ from ragatouille.data import CorpusProcessor
 
 RAG = RAGPretrainedModel.from_pretrained("colbert-ir/colbertv2.0")
 my_documents = [get_wikipedia_page("Hayao_Miyazaki"), get_wikipedia_page("Studio_Ghibli")]
+my_document_ids = ["hayao_miyazaki", "studio_ghibli"]
 processor = CorpusProcessor()
 my_documents = processor.process_corpus(my_documents)
-index_path = RAG.index(index_name="my_index", collection=my_documents)
+index_path = RAG.index(index_name="my_index", documents=my_documents, my_document_ids=my_document_ids)
 ```
 
 Once this is done running, your index will be saved on-disk and ready to be queried! RAGatouille and ColBERT handle everything here:
@@ -173,21 +174,21 @@ index_name="my_index")
 ```python
 # single-query result
 [
-    {"content": "blablabla", "score": 42.424242, "rank": 1},
+    {"content": "blablabla", "score": 42.424242, "rank": 1, "document_id": "x"},
     ...,
-    {"content": "albalbalba", "score": 24.242424, "rank": k},
+    {"content": "albalbalba", "score": 24.242424, "rank": k, "document_id": "y"},
 ]
 # multi-query result
 [
     [
-        {"content": "blablabla", "score": 42.424242, "rank": 1},
+        {"content": "blablabla", "score": 42.424242, "rank": 1, "document_id": "x"},
         ...,
-        {"content": "albalbalba", "score": 24.242424, "rank": k},
+        {"content": "albalbalba", "score": 24.242424, "rank": k, "document_id": "y"},
     ],
     [
-        {"content": "blablabla", "score": 42.424242, "rank": 1},
+        {"content": "blablabla", "score": 42.424242, "rank": 1, "document_id": "x"},
         ...,
-        {"content": "albalbalba", "score": 24.242424, "rank": k},
+        {"content": "albalbalba", "score": 24.242424, "rank": k, "document_id": "y"},
     ],
  ],
 ```

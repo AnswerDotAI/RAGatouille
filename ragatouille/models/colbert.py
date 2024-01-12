@@ -224,7 +224,7 @@ class ColBERT(LateInteractionModel):
                 self.document_metadata_dict, self.index_path + "/document_metadata.json"
             )
 
-        print(f"Successfully deleted documents with IDs: {document_ids}")
+        print(f"Successfully deleted documents with these IDs: {document_ids}")
 
     def index(
         self,
