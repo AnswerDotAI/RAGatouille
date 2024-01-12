@@ -1,6 +1,6 @@
 import os
 import time
-from typing import Union, Optional
+from typing import Union, Optional, TypeVar, List
 from pathlib import Path
 from colbert.infra import Run, ColBERTConfig, RunConfig
 from colbert import Indexer, Searcher, Trainer, IndexUpdater
@@ -18,11 +18,12 @@ class ColBERT(LateInteractionModel):
         index_name: Optional[str] = None,
         verbose: int = 1,
         load_from_index: bool = False,
+        index_root: Optional[str] = None,
         **kwargs,
     ):
         self.verbose = verbose
-        self.collection_with_ids = None
-        self.document_metadata_with_ids = None
+        self.collection = None
+        self.document_metadata_dict = None
         if n_gpu == -1:
             n_gpu = 1 if torch.cuda.device_count() == 0 else torch.cuda.device_count()
 
@@ -36,21 +37,22 @@ class ColBERT(LateInteractionModel):
             )
             self.checkpoint = self.config.checkpoint
             self.index_name = self.config.index_name
-            self.collection_with_ids = self._get_collection_from_file(
+            self.collection = self._get_collection_from_file(
                 str(pretrained_model_name_or_path / "collection.json")
             )
             if os.path.exists(
                 str(pretrained_model_name_or_path / "document_metadata.json")
             ):
-                self.document_metadata_with_ids = self._get_collection_from_file(
+                self.document_metadata_dict = self._get_collection_from_file(
                     str(pretrained_model_name_or_path / "document_metadata.json")
                 )
         else:
+            self.index_root = index_root if index_root is not None else ".ragatouille/"
             ckpt_config = ColBERTConfig.load_from_checkpoint(
                 str(pretrained_model_name_or_path)
             )
             self.run_config = RunConfig(
-                nranks=n_gpu, experiment="colbert", root=".ragatouille/"
+                nranks=n_gpu, experiment="colbert", root=self.index_root
             )
             local_config = ColBERTConfig(**kwargs)
             self.config = ColBERTConfig.from_existing(
@@ -66,9 +68,10 @@ class ColBERT(LateInteractionModel):
 
     def _update_index(
         self,
-        new_documents: list[str],
+        new_documents: List[str],
+        new_document_ids: Union[TypeVar("T"), List[TypeVar("T")]],
         searcher: Searcher,
-        new_document_metadata: Optional[list[dict]] = None,
+        new_document_metadata: Optional[List[dict]] = None,
     ):
         updater = IndexUpdater(
             config=self.config, searcher=searcher, checkpoint=self.checkpoint
@@ -94,6 +97,7 @@ class ColBERT(LateInteractionModel):
     def add_to_index(
         self,
         new_documents: list[str],
+        new_document_ids: Union[TypeVar("T"), List[TypeVar("T")]],
         new_document_metadata: Optional[list[dict]] = None,
         index_name: Optional[str] = None,
     ):
@@ -128,7 +132,7 @@ class ColBERT(LateInteractionModel):
             > 100  # Export bug handler -- TODO: Remove this requirement
         ):
             new_documents += [x for x in searcher.collection]
-            new_document_metadata += [x for x in self.document_metadata_with_ids]
+            new_document_metadata += [x for x in self.document_metadata_dict]
             self.index(
                 new_documents,
                 new_document_metadata,
@@ -151,10 +155,17 @@ class ColBERT(LateInteractionModel):
             / self.index_name
         )
 
+    def delete_from_index(
+        self,
+        document_ids: Union[TypeVar("T"), List[TypeVar("T")]],
+        index_name: Optional[str] = None,
+    ):
+        return NotImplementedError
+    
     def index(
         self,
-        collection_with_ids: list[dict],
-        document_metadata_with_ids: Optional[list[dict]] = None,
+        collection: List[dict],
+        document_metadata_dict: Optional[dict] = None,
         index_name: Optional["str"] = None,
         max_document_length: int = 256,
         overwrite: Union[bool, str] = "reuse",
@@ -189,9 +200,8 @@ class ColBERT(LateInteractionModel):
                 )
             self.index_name = self.checkpoint + "new_index"
 
-        # collection = list(set(collection)) # do we need this?
-        self.collection = [x["content"] for x in collection_with_ids]
-        self.collection_with_ids = collection_with_ids
+        self.collection = collection
+        collection_content = [x["content"] for x in collection] 
 
         nbits = 2
         if len(self.collection) < 5000:
@@ -207,7 +217,7 @@ class ColBERT(LateInteractionModel):
             verbose=self.verbose,
         )
         self.indexer.index(
-            name=self.index_name, collection=self.collection, overwrite=overwrite
+            name=self.index_name, collection=collection_content, overwrite=overwrite
         )
 
         index_path = str(
@@ -217,16 +227,18 @@ class ColBERT(LateInteractionModel):
             / self.index_name
         )
         self._write_collection_to_file(
-            collection_with_ids, index_path + "/collection.json"
+            collection, index_path + "/collection.json"
         )
 
-        if document_metadata_with_ids is not None:
+        if document_metadata_dict is not None:
             self._write_collection_to_file(
-                document_metadata_with_ids, index_path + "/document_metadata.json"
+                document_metadata_dict, index_path + "/document_metadata.json"
             )
-            self.document_metadata_with_ids = document_metadata_with_ids
+            self.document_metadata_dict = document_metadata_dict
 
         print("Done indexing!")
+
+        return index_path
 
     def _load_searcher(
         self,
@@ -299,15 +311,15 @@ class ColBERT(LateInteractionModel):
         for result in results:
             result_for_query = []
             for id_, rank, score in zip(*result):
-                document_id = self.collection_with_ids[id_]["document_id"]
+                document_id = self.collection[id_]["document_id"]
                 result_dict = {
                     "document_id": document_id,
-                    "content": self.collection[id_],
+                    "content": self.collection[id_]["content"],
                     "score": score,
                     "rank": rank - 1 if zero_index_ranks else rank,
                 }
-                if self.document_metadata_with_ids is not None:
-                    doc_metadata = self.document_metadata_with_ids[document_id]
+                if self.document_metadata_dict is not None:
+                    doc_metadata = self.document_metadata_dict[document_id]
                     result_dict["document_metadata"] = doc_metadata
                 result_for_query.append(result_dict)
             to_return.append(result_for_query)

@@ -1,4 +1,4 @@
-from typing import Callable, Optional, Union, List, Any
+from typing import Callable, Optional, Union, List, Any, TypeVar
 from pathlib import Path
 from langchain_core.retrievers import BaseRetriever
 from langchain_core.documents import Document
@@ -50,6 +50,7 @@ class RAGPretrainedModel:
         pretrained_model_name_or_path: Union[str, Path],
         n_gpu: int = -1,
         verbose: int = 1,
+        index_root: Optional[str] = None
     ):
         """Load a ColBERT model from a pre-trained checkpoint.
 
@@ -62,7 +63,7 @@ class RAGPretrainedModel:
             cls (RAGPretrainedModel): The current instance of RAGPretrainedModel, with the model initialised.
         """
         instance = cls()
-        instance.model = ColBERT(pretrained_model_name_or_path, n_gpu, verbose=verbose)
+        instance.model = ColBERT(pretrained_model_name_or_path, n_gpu, index_root=index_root, verbose=verbose)
         return instance
 
     @classmethod
@@ -89,9 +90,9 @@ class RAGPretrainedModel:
 
     def index(
         self,
-        collection: list[str],
-        document_ids: Optional[list[str]] = None,
-        document_metadata: Optional[list[dict]] = None,
+        documents: list[str],
+        document_ids: Union[TypeVar("T"), List[TypeVar("T")]],
+        document_metadatas: Optional[list[dict]] = None,
         index_name: str = None,
         overwrite_index: bool = True,
         max_document_length: int = 256,
@@ -112,34 +113,36 @@ class RAGPretrainedModel:
             index (str): The path to the index that was built.
         """
 
-        if document_ids is None:
-            document_ids = [str(uuid4()) for x in range(len(collection))]
-
-        if len(document_ids) != len(collection):
-            raise ValueError("Supplied document ids and collection must be the same length.")
+        if len(document_ids) != len(documents):
+            raise ValueError("Document IDs and documents must be the same length.")
+        
+        if len(set(document_ids)) != len(document_ids):
+            raise ValueError("Document IDs must be unique.")
 
         if split_documents or preprocessing_fn is not None:
             self.corpus_processor = CorpusProcessor(
                 document_splitter_fn=document_splitter_fn if split_documents else None,
                 preprocessing_fn=preprocessing_fn,
             )
-            collection_with_ids = self.corpus_processor.process_corpus(
-                collection,
+            collection = self.corpus_processor.process_corpus(
+                documents,
                 document_ids,
                 chunk_size=max_document_length,
             )
         else:
-            collection_with_ids = [{"document_id": x, "content": y} for x, y in zip(document_ids, collection)]
+            collection = [{"document_id": x, "content": y} for x, y in zip(document_ids, documents)]
         
-        if document_metadata is not None:
-            document_metadata_with_ids = {x:y for x, y in zip(document_ids, document_metadata)}
+        if document_metadatas is not None:
+            document_metadata_dict = {x:y for x, y in zip(document_ids, document_metadatas)}
+        else:
+            document_metadata_dict = None
         
         overwrite = "reuse"
         if overwrite_index:
             overwrite = True
         return self.model.index(
-            collection_with_ids,
-            document_metadata_with_ids,
+            collection,
+            document_metadata_dict,
             index_name,
             max_document_length=max_document_length,
             overwrite=overwrite,
