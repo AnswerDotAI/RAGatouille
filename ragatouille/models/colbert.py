@@ -392,8 +392,9 @@ class ColBERT(LateInteractionModel):
                     "document_id": document_id,
                 }
                 if self.document_metadata_dict is not None:
-                    doc_metadata = self.document_metadata_dict[document_id]
-                    result_dict["document_metadata"] = doc_metadata
+                    if document_id in self.document_metadata_dict:
+                        doc_metadata = self.document_metadata_dict[document_id]
+                        result_dict["document_metadata"] = doc_metadata
                 result_for_query.append(result_dict)
             to_return.append(result_for_query)
 
