@@ -199,7 +199,7 @@ def test_delete_from_index(
             deleted_doc_id
         }, "Only the deleted document ID should be missing from the document metadata."
 
-@pytest.mark.skip(reason="Not implemented yet.")
+
 def test_add_to_index(
     index_creation_inputs,
     collection_path_fixture,
@@ -207,20 +207,28 @@ def test_add_to_index(
     index_path_fixture,
 ):
     RAG = RAGPretrainedModel.from_index(index_path_fixture)
-    new_doc_id = "new_doc_id"
-    new_doc = "This is a new document."
+    new_doc_ids = ["mononoke", "sabaku_no_tami"]
+    new_docs = [
+        "Princess Mononoke (Japanese: もののけ姫, Hepburn: Mononoke-hime) is a 1997 Japanese animated epic historical fantasy film written and directed by Hayao Miyazaki and animated by Studio Ghibli for Tokuma Shoten, Nippon Television Network and Dentsu. The film stars the voices of Yōji Matsuda, Yuriko Ishida, Yūko Tanaka, Kaoru Kobayashi, Masahiko Nishimura, Tsunehiko Kamijo, Akihiro Miwa, Mitsuko Mori, and Hisaya Morishige.\nPrincess Mononoke is set in the late Muromachi period of Japan (approximately 1336 to 1573 AD) and includes fantasy elements. The story follows a young Emishi prince named Ashitaka, and his involvement in a struggle between the gods (kami) of a forest and the humans who consume its resources. The film deals with themes of Shinto and environmentalism.\nThe film was released in Japan on July 12, 1997, by Toho, and in the United States on October 29, 1999. This was the first Studio Ghibli film in the United States to be rated PG-13 by the MPA. It was a critical and commercial blockbuster, becoming the highest-grossing film in Japan of 1997, and also held Japan's box office record for domestic films until 2001's Spirited Away, another Miyazaki film. It was dubbed into English with a script by Neil Gaiman and initially distributed in North America by Miramax, where it sold well on home media despite not performing strongly at the box office. The film greatly increased Ghibli's popularity and influence outside Japan.",
+        "People of the Desert (砂漠の民, Sabaku no Tami, translated on the cover as The People of Desert), or The Desert Tribe, is a comic strip written and illustrated by Hayao Miyazaki. It was serialized, under the pseudonym Akitsu Saburō (秋津三朗), and ran in Boys and Girls Newspaper (少年少女新聞, Shōnen Shōjo Shinbun) between September 12, 1969, and March 15, 1970.\n\n\n== Story ==\nThe story is set in the distant past, on the fictionalised desert plains of Central Asia. Part of the story takes place in the fortified city named Pejite (ペジテ). The story follows the exploits of the main character, Tem (テム, Temu), a shepherd boy of the fictional Sokut (ソクート, Sokūto) tribe, as he tries to evade the mounted militia of the nomadic Kittāru (キッタール) tribe. In order to restore peace to the realm, Tem rallies his remaining compatriots and rebels against the Kittāru\'s attempts to gain control of the Sokut territory and enslave its inhabitants through military force.\n\n\n== Background, publication and influences ==\nMiyazaki initially wanted to become a manga artist but started his professional career as an animator for Toei Animation in 1963. Here he worked on animated television series and animated feature-length films for theatrical release. He never abandoned his childhood dream of becoming a manga artist completely, however, and his professional debut as a manga creator came in 1969 with the publication of his manga interpretation of Puss \'n Boots, which was serialized in 12 weekly instalments in the Sunday edition of Tokyo Shimbun, from January to March 1969. Printed in colour and created for promotional purposes in conjunction with his work on Toei\'s animated film of the same title, directed by Kimio Yabuki.\nIn 1969 pseudonymous serialization also started of Miyazaki\'s original manga People of the Desert (砂漠の民, Sabaku no Tami). This strip was created in the style of illustrated stories (絵物語, emonogatari) he read in boys\' magazines and tankōbon volumes while growing up, such as Soji Yamakawa\'s Shōnen Ōja (少年王者) and in particular Tetsuji Fukushima\'s Evil Lord of the Desert (沙漠の魔王, Sabaku no Maō). Miyazaki\'s People of the Desert is a continuation of that tradition. In People of the Desert expository text is presented separately from the monochrome artwork but Miyazaki progressively used additional text balloons inside the panels for dialogue.\nPeople of the Desert was serialized in 26 weekly instalments which were printed in Boys and Girls Newspaper (少年少女新聞, Shōnen shōjo shinbun), a publication of the Japanese Communist Party, between September 12, 1969 (issue 28) and March 15, 1970 (issue 53). The strip was published under the pseudonym Akitsu Saburō (秋津三朗).\nThe strip has been identified as a precursor for Miyazaki\'s manga Nausicaä of the Valley of the Wind (1982–1995) and the one-off graphic novel Shuna\'s Journey (1983), published by Tokuma Shoten."
+    ]
+    new_doc_metadata = [
+        {"entity": "film", "source": "wikipedia"},
+        {"entity": "manga", "source": "wikipedia"},
+    ]
     RAG.add_to_index(
-        new_documents=[new_doc],
-        new_metadata=[{"entity": "person", "source": "wikipedia"}],
+        new_documents=new_docs,
+        new_document_ids=new_doc_ids,
+        new_document_metadatas=new_doc_metadata,
         index_name=index_creation_inputs["index_name"],
     )
     collection_data = srsly.read_json(collection_path_fixture)
     collection_data_ids = set([item["document_id"] for item in collection_data])
-    assert (
-        new_doc_id in collection_data_ids
-    ), "New document ID should be in the collection."
-
     document_metadata_dict = srsly.read_json(document_metadata_path_fixture)
-    assert (
-        new_doc_id in document_metadata_dict
-    ), "New document ID should be in the document metadata."
+    for new_doc_id in new_doc_ids:
+        assert (
+            new_doc_id in collection_data_ids
+        ), f"New document ID {new_doc_id} should be in the collection."
+        assert (
+            new_doc_id in document_metadata_dict
+        ), f"New document ID {new_doc_id} should be in the document metadata."

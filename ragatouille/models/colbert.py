@@ -69,28 +69,6 @@ class ColBERT(LateInteractionModel):
         self.run_context.__enter__()  # Manually enter the context
         self.searcher = None
 
-    def _update_index(
-        self,
-        new_documents: List[str],
-        #new_document_ids: Union[TypeVar("T"), List[TypeVar("T")]],
-        searcher: Searcher,
-        new_document_metadata: Optional[List[dict]] = None,
-    ):
-        updater = IndexUpdater(
-            config=self.config, searcher=searcher, checkpoint=self.checkpoint
-        )
-        updater.add(new_documents)
-        updater.persist_to_disk()
-
-        new_documents += [x for x in searcher.collection]
-        new_document_metadata += [x for x in self.document_metadata]
-
-        self._write_collection_to_file(new_documents, self.index_path + "/collection.json")
-        if self.document_metadata is not None:
-            self._write_collection_to_file(
-                new_document_metadata, self.index_path + "/document_metadata.json"
-            )
-
     def _get_collection_from_file(self, collection_path: str):
         return srsly.read_json(collection_path)
 
@@ -99,9 +77,8 @@ class ColBERT(LateInteractionModel):
 
     def add_to_index(
         self,
-        new_documents: list[str],
-        #new_document_ids: Union[TypeVar("T"), List[TypeVar("T")]],
-        new_document_metadata: Optional[list[dict]] = None,
+        new_documents_with_ids: List[dict],
+        new_document_metadata_dict: Optional[List[dict]] = None,
         index_name: Optional[str] = None,
     ):
         self.index_name = index_name if index_name is not None else self.index_name
@@ -124,9 +101,24 @@ class ColBERT(LateInteractionModel):
             index=self.index_name,
             verbose=self.verbose,
         )
-        new_documents = list(set(new_documents))
+
         current_len = len(searcher.collection)
-        new_doc_len = len(new_documents)
+        new_doc_len = len(new_documents_with_ids)
+
+        merged_documents_with_ids = [
+            doc
+            for doc in new_documents_with_ids
+            if doc["document_id"]
+            not in [
+                existing_doc["document_id"] for existing_doc in self.collection_with_ids
+            ]
+        ]
+        if new_document_metadata_dict is not None:
+            if self.document_metadata_dict is None:
+                self.document_metadata_dict = {}
+            for doc_id, metadata in new_document_metadata_dict.items():
+                if doc_id not in self.document_metadata_dict:
+                    self.document_metadata_dict[doc_id] = metadata
 
         if (
             current_len + new_doc_len < 5000
@@ -134,29 +126,45 @@ class ColBERT(LateInteractionModel):
             or current_len + new_doc_len
             > 100  # Export bug handler -- TODO: Remove this requirement
         ):
-            new_documents += [x for x in searcher.collection]
-            new_document_metadata += [x for x in self.document_metadata_dict]
             self.index(
-                new_documents,
-                new_document_metadata,
+                merged_documents_with_ids,
+                document_metadata_dict=self.document_metadata_dict,
                 index_name=self.index_name,
                 max_document_length=self.config.doc_maxlen,
                 overwrite="force_silent_overwrite",
             )
         else:
-            self._update_index(new_documents, new_document_metadata, searcher)
+            new_documents = [x["content"] for x in new_documents_with_ids]
+            updater = IndexUpdater(
+                config=self.config, searcher=searcher, checkpoint=self.checkpoint
+            )
+            updater.add(new_documents)
+            updater.persist_to_disk()
+
+            self.collection_with_ids = merged_documents_with_ids
+            self.collection = [x["content"] for x in self.collection_with_ids]
+
+            self._write_collection_to_file(
+                self.collection_with_ids, self.index_path + "/collection.json"
+            )
+            if self.document_metadata_dict is not None:
+                self._write_collection_to_file(
+                    self.document_metadata_dict, self.index_path + "/document_metadata.json"
+                )
 
         print(
             f"Successfully updated index with {new_doc_len} new documents!\n",
             f"New index size: {new_doc_len + current_len}",
         )
 
-        return str(
+        self.index_path = str(
             Path(self.run_config.root)
             / Path(self.run_config.experiment)
             / "indexes"
             / self.index_name
         )
+
+        return self.index_path
 
     def delete_from_index(
         self,
@@ -188,22 +196,36 @@ class ColBERT(LateInteractionModel):
             config=self.config, searcher=searcher, checkpoint=self.checkpoint
         )
 
-        pids = [i for i, doc in enumerate(self.collection_with_ids) if doc["document_id"] in document_ids]
+        pids = [
+            i
+            for i, doc in enumerate(self.collection_with_ids)
+            if doc["document_id"] in document_ids
+        ]
         updater.remove(pids)
         updater.persist_to_disk()
 
-        self.collection_with_ids = [doc for doc in self.collection_with_ids if doc["document_id"] not in document_ids]
+        self.collection_with_ids = [
+            doc
+            for doc in self.collection_with_ids
+            if doc["document_id"] not in document_ids
+        ]
         self.collection = [doc["content"] for doc in self.collection_with_ids]
 
-        self._write_collection_to_file(self.collection_with_ids, self.index_path + "/collection.json")
+        self._write_collection_to_file(
+            self.collection_with_ids, self.index_path + "/collection.json"
+        )
         if self.document_metadata_dict is not None:
-            self.document_metadata_dict = {k: v for k, v in self.document_metadata_dict.items() if k not in document_ids}
+            self.document_metadata_dict = {
+                k: v
+                for k, v in self.document_metadata_dict.items()
+                if k not in document_ids
+            }
             self._write_collection_to_file(
                 self.document_metadata_dict, self.index_path + "/document_metadata.json"
             )
 
         print(f"Successfully deleted documents with IDs: {document_ids}")
-    
+
     def index(
         self,
         collection_with_ids: List[dict],
@@ -243,7 +265,7 @@ class ColBERT(LateInteractionModel):
             self.index_name = self.checkpoint + "new_index"
 
         self.collection_with_ids = collection_with_ids
-        self.collection = [x["content"] for x in self.collection_with_ids] 
+        self.collection = [x["content"] for x in self.collection_with_ids]
 
         nbits = 2
         if len(self.collection) < 5000:

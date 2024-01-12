@@ -142,8 +142,8 @@ class RAGPretrainedModel:
             overwrite = True
         return self.model.index(
             collection_with_ids,
-            document_metadata_dict,
-            index_name,
+            document_metadata_dict=document_metadata_dict,
+            index_name=index_name,
             max_document_length=max_document_length,
             overwrite=overwrite,
         )
@@ -169,22 +169,30 @@ class RAGPretrainedModel:
             raise ValueError("Document IDs and documents must be the same length.")
         
         if len(set(new_document_ids)) != len(new_document_ids):
-            raise ValueError("Document IDs must be unique.")
+            raise ValueError("New document IDs must be unique.")
         
-
+        
         if split_documents or preprocessing_fn is not None:
             self.corpus_processor = CorpusProcessor(
                 document_splitter_fn=document_splitter_fn if split_documents else None,
                 preprocessing_fn=preprocessing_fn,
             )
-            new_documents = self.corpus_processor.process_corpus(
+            new_documents_with_ids = self.corpus_processor.process_corpus(
                 new_documents,
+                new_document_ids,
                 chunk_size=self.model.config.doc_maxlen,
             )
+        else:
+            new_documents_with_ids = [{"document_id": x, "content": y} for x, y in zip(new_document_ids, new_documents)]
+
+        if new_document_metadatas is not None:
+            new_document_metadata_dict = {x:y for x, y in zip(new_document_ids, new_document_metadatas)}
+        else:
+            new_document_metadata_dict = None
 
         self.model.add_to_index(
-            new_documents,
-            new_metadata,
+            new_documents_with_ids,
+            new_document_metadata_dict=new_document_metadata_dict,
             index_name=index_name,
         )
 
@@ -200,7 +208,7 @@ class RAGPretrainedModel:
             index_name (Optional[str]): The name of the index to delete documents from. If None and by default, will delete documents from the already initialised one.
         """
         self.model.delete_from_index(
-            document_ids=document_ids,
+            document_ids,
             index_name=index_name,
         )
 
