@@ -35,9 +35,21 @@ def index_path_fixture(persistent_temp_index_root, index_creation_inputs):
         str(persistent_temp_index_root),
         "colbert",
         "indexes",
-        index_creation_inputs["index_name"]
+        index_creation_inputs["index_name"],
     )
     return str(index_path)
+
+
+@pytest.fixture
+def collection_path_fixture(index_path_fixture):
+    collection_path = os.path.join(index_path_fixture, "collection.json")
+    return str(collection_path)
+
+
+@pytest.fixture
+def document_metadata_path_fixture(index_path_fixture):
+    document_metadata_path = os.path.join(index_path_fixture, "document_metadata.json")
+    return str(document_metadata_path)
 
 
 @pytest.fixture(
@@ -80,17 +92,15 @@ def index_creation_inputs(request):
     return request.param
 
 
-# @pytest.mark.skip(reason="iterating without recreating indexes")
 def test_index_creation(RAG_from_pretrained_model, index_creation_inputs):
     RAG = RAG_from_pretrained_model
     index_path = RAG.index(**index_creation_inputs)
     assert os.path.exists(index_path) == True
 
 
-def test_document_id_in_collection(index_creation_inputs, index_path_fixture):
-    collection_path = index_path_fixture + "/collection.json"
-    assert os.path.exists(collection_path) == True
-    collection_data = srsly.read_json(collection_path)
+def test_document_id_in_collection(index_creation_inputs, collection_path_fixture):
+    assert os.path.exists(collection_path_fixture) == True
+    collection_data = srsly.read_json(collection_path_fixture)
     assert isinstance(
         collection_data, list
     ), "The collection.json file should contain a list."
@@ -109,11 +119,12 @@ def test_document_id_in_collection(index_creation_inputs, index_path_fixture):
     ), "All document_ids provided for index creation should be present in the collection.json."
 
 
-def test_document_metadata_creation(index_creation_inputs, index_path_fixture):
-    document_metadata_path = index_path_fixture + "/document_metadata.json"
+def test_document_metadata_creation(
+    index_creation_inputs, document_metadata_path_fixture
+):
     if "document_metadatas" in index_creation_inputs:
-        assert os.path.exists(document_metadata_path) == True
-        document_metadata_dict = srsly.read_json(document_metadata_path)
+        assert os.path.exists(document_metadata_path_fixture) == True
+        document_metadata_dict = srsly.read_json(document_metadata_path_fixture)
         assert (
             set(document_metadata_dict.keys())
             == set(index_creation_inputs["document_ids"])
@@ -128,7 +139,7 @@ def test_document_metadata_creation(index_creation_inputs, index_path_fixture):
                 doc_id
             )
     else:
-        assert os.path.exists(document_metadata_path) == False
+        assert os.path.exists(document_metadata_path_fixture) == False
 
 
 def test_document_metadata_returned_in_search_results(
@@ -157,3 +168,59 @@ def test_document_metadata_returned_in_search_results(
                 "metadata" not in result
             ), "The metadata should not be returned in the results."
 
+
+def test_delete_from_index(
+    index_creation_inputs,
+    collection_path_fixture,
+    document_metadata_path_fixture,
+    index_path_fixture,
+):
+    RAG = RAGPretrainedModel.from_index(index_path_fixture)
+    deleted_doc_id = index_creation_inputs["document_ids"][0]
+    original_doc_ids = set(index_creation_inputs["document_ids"])
+    RAG.delete_from_index(
+        index_name=index_creation_inputs["index_name"],
+        document_ids=[deleted_doc_id],
+    )
+    collection_data = srsly.read_json(collection_path_fixture)
+    collection_data_ids = set([item["document_id"] for item in collection_data])
+    assert (
+        deleted_doc_id not in collection_data_ids
+    ), "Deleted document ID should not be in the collection."
+    assert original_doc_ids - collection_data_ids == {
+        deleted_doc_id
+    }, "Only the deleted document ID should be missing from the collection."
+    if "document_metadatas" in index_creation_inputs:
+        document_metadata_dict = srsly.read_json(document_metadata_path_fixture)
+        assert (
+            deleted_doc_id not in document_metadata_dict
+        ), "Deleted document ID should not be in the document metadata."
+        assert original_doc_ids - set(document_metadata_dict.keys()) == {
+            deleted_doc_id
+        }, "Only the deleted document ID should be missing from the document metadata."
+
+@pytest.mark.skip(reason="Not implemented yet.")
+def test_add_to_index(
+    index_creation_inputs,
+    collection_path_fixture,
+    document_metadata_path_fixture,
+    index_path_fixture,
+):
+    RAG = RAGPretrainedModel.from_index(index_path_fixture)
+    new_doc_id = "new_doc_id"
+    new_doc = "This is a new document."
+    RAG.add_to_index(
+        new_documents=[new_doc],
+        new_metadata=[{"entity": "person", "source": "wikipedia"}],
+        index_name=index_creation_inputs["index_name"],
+    )
+    collection_data = srsly.read_json(collection_path_fixture)
+    collection_data_ids = set([item["document_id"] for item in collection_data])
+    assert (
+        new_doc_id in collection_data_ids
+    ), "New document ID should be in the collection."
+
+    document_metadata_dict = srsly.read_json(document_metadata_path_fixture)
+    assert (
+        new_doc_id in document_metadata_dict
+    ), "New document ID should be in the document metadata."

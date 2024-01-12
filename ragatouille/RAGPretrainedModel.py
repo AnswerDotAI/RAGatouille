@@ -100,10 +100,10 @@ class RAGPretrainedModel:
         document_splitter_fn: Optional[Callable] = llama_index_sentence_splitter,
         preprocessing_fn: Optional[Union[Callable, list[Callable]]] = None,
     ):
-        """Build an index from a collection of documents.
+        """Build an index from a list of documents.
 
         Parameters:
-            collection (list[str]): The collection of documents to index.
+            documents (list[str]): The list of documents to index.
             document_ids (Optional[list[str]]): An optional list of document ids. Ids will be generated at index time if not supplied.
             metadata (Optional[list[dict]]): An optional list of metadata dicts
             index_name (str): The name of the index that will be built.
@@ -124,13 +124,13 @@ class RAGPretrainedModel:
                 document_splitter_fn=document_splitter_fn if split_documents else None,
                 preprocessing_fn=preprocessing_fn,
             )
-            collection = self.corpus_processor.process_corpus(
+            collection_with_ids = self.corpus_processor.process_corpus(
                 documents,
                 document_ids,
                 chunk_size=max_document_length,
             )
         else:
-            collection = [{"document_id": x, "content": y} for x, y in zip(document_ids, documents)]
+            collection_with_ids = [{"document_id": x, "content": y} for x, y in zip(document_ids, documents)]
         
         if document_metadatas is not None:
             document_metadata_dict = {x:y for x, y in zip(document_ids, document_metadatas)}
@@ -141,7 +141,7 @@ class RAGPretrainedModel:
         if overwrite_index:
             overwrite = True
         return self.model.index(
-            collection,
+            collection_with_ids,
             document_metadata_dict,
             index_name,
             max_document_length=max_document_length,
@@ -151,7 +151,8 @@ class RAGPretrainedModel:
     def add_to_index(
         self,
         new_documents: list[str],
-        new_metadata: Optional[list[dict]] = None,
+        new_document_ids: Union[TypeVar("T"), List[TypeVar("T")]],
+        new_document_metadatas: Optional[list[dict]] = None,
         index_name: Optional[str] = None,
         split_documents: bool = True,
         document_splitter_fn: Optional[Callable] = llama_index_sentence_splitter,
@@ -163,6 +164,14 @@ class RAGPretrainedModel:
             new_documents (list[str]): The documents to add to the index.
             index_name (Optional[str]): The name of the index to add documents to. If None and by default, will add documents to the already initialised one.
         """
+
+        if len(new_document_ids) != len(new_documents):
+            raise ValueError("Document IDs and documents must be the same length.")
+        
+        if len(set(new_document_ids)) != len(new_document_ids):
+            raise ValueError("Document IDs must be unique.")
+        
+
         if split_documents or preprocessing_fn is not None:
             self.corpus_processor = CorpusProcessor(
                 document_splitter_fn=document_splitter_fn if split_documents else None,
@@ -176,6 +185,22 @@ class RAGPretrainedModel:
         self.model.add_to_index(
             new_documents,
             new_metadata,
+            index_name=index_name,
+        )
+
+    def delete_from_index(
+        self,
+        document_ids: Union[TypeVar("T"), List[TypeVar("T")]],
+        index_name: Optional[str] = None,
+    ):
+        """Delete documents from an index by their IDs.
+
+        Parameters:
+            document_ids (Union[TypeVar("T"), List[TypeVar("T")]]): The IDs of the documents to delete.
+            index_name (Optional[str]): The name of the index to delete documents from. If None and by default, will delete documents from the already initialised one.
+        """
+        self.model.delete_from_index(
+            document_ids=document_ids,
             index_name=index_name,
         )
 
