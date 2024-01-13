@@ -33,6 +33,11 @@ ruff = "^0.1.9"
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore::Warning"
+]
+
 [tool.ruff]
 # Exclude a variety of commonly ignored directories.
 exclude = [
@@ -52,6 +57,8 @@ exclude = [
     ".venv",
     "__pypackages__",
     "_build",
+    "*.ipynb",
+    "examples",
     "buck-out",
     "build",
     "dist",
