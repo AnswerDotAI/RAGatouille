@@ -1,8 +1,7 @@
 import math
-from typing import Union, Optional, Literal
 import os
 import time
-from typing import Union, Optional, TypeVar, List
+from typing import Union, Optional, TypeVar, List, Dict, Literal
 from pathlib import Path
 from colbert.infra import Run, ColBERTConfig, RunConfig
 from colbert import Indexer, Searcher, Trainer, IndexUpdater
@@ -10,6 +9,7 @@ from colbert.modeling.checkpoint import Checkpoint
 import torch
 import srsly
 import numpy as np
+from collections import defaultdict
 
 from ragatouille.models.base import LateInteractionModel
 
@@ -27,8 +27,8 @@ class ColBERT(LateInteractionModel):
     ):
         self.verbose = verbose
         self.collection = None
-        self.collection_with_ids = None
-        self.document_metadata_dict = None
+        self.pid_docid_map = None
+        self.docid_metadata_map = None
         self.in_memory_docs = []
         if n_gpu == -1:
             n_gpu = 1 if torch.cuda.device_count() == 0 else torch.cuda.device_count()
@@ -44,15 +44,20 @@ class ColBERT(LateInteractionModel):
             )
             self.checkpoint = self.config.checkpoint
             self.index_name = self.config.index_name
-            self.collection_with_ids = self._get_collection_from_file(
+            self.collection = self._get_collection_from_file(
                 str(pretrained_model_name_or_path / "collection.json")
             )
-            self.collection = [x["content"] for x in self.collection_with_ids]
+            self.pid_docid_map = self._get_collection_from_file(
+                str(pretrained_model_name_or_path / "pid_docid_map.json")
+            )
+            self.docid_pid_map = defaultdict(list)
+            for pid, docid in self.pid_docid_map.items():
+                self.docid_pid_map[docid].append(pid)
             if os.path.exists(
-                str(pretrained_model_name_or_path / "document_metadata.json")
+                str(pretrained_model_name_or_path / "docid_metadata_map.json")
             ):
-                self.document_metadata_dict = self._get_collection_from_file(
-                    str(pretrained_model_name_or_path / "document_metadata.json")
+                self.docid_metadata_map = self._get_collection_from_file(
+                    str(pretrained_model_name_or_path / "docid_metadata_map.json")
                 )
         else:
             self.index_root = index_root if index_root is not None else ".ragatouille/"
@@ -86,8 +91,9 @@ class ColBERT(LateInteractionModel):
 
     def add_to_index(
         self,
-        new_documents_with_ids: List[dict],
-        new_document_metadata_dict: Optional[List[dict]] = None,
+        new_documents: List[str],
+        new_pid_docid_map: Dict[int, str],
+        new_docid_metadata_map: Optional[List[dict]] = None,
         index_name: Optional[str] = None,
     ):
         self.index_name = index_name if index_name is not None else self.index_name
@@ -112,58 +118,54 @@ class ColBERT(LateInteractionModel):
         )
 
         current_len = len(searcher.collection)
-        new_doc_len = len(new_documents_with_ids)
-
-        merged_documents_with_ids = [
-            doc
-            for doc in new_documents_with_ids
-            if doc["document_id"]
-            not in [
-                existing_doc["document_id"] for existing_doc in self.collection_with_ids
-            ]
+        new_doc_len = len(new_documents)
+        new_documents_with_ids = [
+            {"content": doc, "document_id": new_pid_docid_map[pid]}
+            for pid, doc in enumerate(new_documents)
+            if new_pid_docid_map[pid] not in self.pid_docid_map
         ]
-        if new_document_metadata_dict is not None:
-            if self.document_metadata_dict is None:
-                self.document_metadata_dict = {}
-            for doc_id, metadata in new_document_metadata_dict.items():
-                if doc_id not in self.document_metadata_dict:
-                    self.document_metadata_dict[doc_id] = metadata
 
-        if (
-            current_len + new_doc_len < 5000
-            or new_doc_len > current_len * 0.05
-            or current_len + new_doc_len
-            > 100  # Export bug handler -- TODO: Remove this requirement
-        ):
+        if new_docid_metadata_map is not None:
+            self.docid_metadata_map = self.docid_metadata_map or {}
+            self.docid_metadata_map.update(new_docid_metadata_map)
+
+        if current_len + new_doc_len < 5000 or new_doc_len > current_len * 0.05:
             self.index(
-                merged_documents_with_ids,
-                document_metadata_dict=self.document_metadata_dict,
+                [doc["content"] for doc in new_documents_with_ids],
+                {
+                    pid: doc["document_id"]
+                    for pid, doc in enumerate(new_documents_with_ids)
+                },
+                docid_metadata_map=self.docid_metadata_map,
                 index_name=self.index_name,
                 max_document_length=self.config.doc_maxlen,
                 overwrite="force_silent_overwrite",
             )
         else:
-            new_documents = [x["content"] for x in new_documents_with_ids]
             updater = IndexUpdater(
                 config=self.config, searcher=searcher, checkpoint=self.checkpoint
             )
-            updater.add(new_documents)
+            updater.add([doc["content"] for doc in new_documents_with_ids])
             updater.persist_to_disk()
 
-            self.collection_with_ids = merged_documents_with_ids
-            self.collection = [x["content"] for x in self.collection_with_ids]
+        self.pid_docid_map.update(
+            {pid: doc["document_id"] for pid, doc in enumerate(new_documents_with_ids)}
+        )
+        self.docid_pid_map = defaultdict(list)
+        for pid, docid in self.pid_docid_map.items():
+            self.docid_pid_map[docid].append(pid)
 
+        self._write_collection_to_file(
+            self.pid_docid_map, self.index_path + "/pid_docid_map.json"
+        )
+        if self.docid_metadata_map is not None:
             self._write_collection_to_file(
-                self.collection_with_ids, self.index_path + "/collection.json"
+                self.docid_metadata_map, self.index_path + "/docid_metadata_map.json"
             )
-            if self.document_metadata_dict is not None:
-                self._write_collection_to_file(
-                    self.document_metadata_dict, self.index_path + "/document_metadata.json"
-                )
 
         print(
-            f"Successfully updated index with {new_doc_len} new documents!\n",
-            f"New index size: {new_doc_len + current_len}",
+            f"Successfully updated index with {len(new_documents_with_ids)} new documents!\n",
+            f"New index size: {current_len + len(new_documents_with_ids)}",
         )
 
         self.index_path = str(
@@ -183,7 +185,7 @@ class ColBERT(LateInteractionModel):
         self.index_name = index_name if index_name is not None else self.index_name
         if self.index_name is None:
             print(
-                "Cannot add to index without an index_name! Please provide one.",
+                "Cannot delete from index without an index_name! Please provide one.",
                 "Returning empty results.",
             )
             return None
@@ -193,6 +195,7 @@ class ColBERT(LateInteractionModel):
             "delete_from_index support will be more thorough in future versions",
         )
 
+        # Initialize the searcher and updater
         searcher = Searcher(
             checkpoint=self.checkpoint,
             config=None,
@@ -200,45 +203,39 @@ class ColBERT(LateInteractionModel):
             index=self.index_name,
             verbose=self.verbose,
         )
-
         updater = IndexUpdater(
             config=self.config, searcher=searcher, checkpoint=self.checkpoint
         )
 
-        pids = [
-            i
-            for i, doc in enumerate(self.collection_with_ids)
-            if doc["document_id"] in document_ids
-        ]
-        updater.remove(pids)
+        pids_to_remove = []
+        for pid, docid in self.pid_docid_map.items():
+            if docid in document_ids:
+                pids_to_remove.append(pid)
+
+        updater.remove(pids_to_remove)
         updater.persist_to_disk()
 
-        self.collection_with_ids = [
-            doc
-            for doc in self.collection_with_ids
-            if doc["document_id"] not in document_ids
-        ]
-        self.collection = [doc["content"] for doc in self.collection_with_ids]
+        self.collection = [doc for pid, doc in enumerate(self.collection) if pid not in pids_to_remove]
+        self.pid_docid_map = {pid: docid for pid, docid in self.pid_docid_map.items() if pid not in pids_to_remove}
+        self.docid_pid_map = defaultdict(list)
+        for pid, docid in self.pid_docid_map.items():
+            self.docid_pid_map[docid].append(pid)
 
-        self._write_collection_to_file(
-            self.collection_with_ids, self.index_path + "/collection.json"
-        )
-        if self.document_metadata_dict is not None:
-            self.document_metadata_dict = {
-                k: v
-                for k, v in self.document_metadata_dict.items()
-                if k not in document_ids
-            }
-            self._write_collection_to_file(
-                self.document_metadata_dict, self.index_path + "/document_metadata.json"
-            )
+        if self.docid_metadata_map is not None:
+            self.docid_metadata_map = {docid: metadata for docid, metadata in self.docid_metadata_map.items() if docid not in document_ids}
+
+        self._write_collection_to_file(self.collection, self.index_path + "/collection.json")
+        self._write_collection_to_file(self.pid_docid_map, self.index_path + "/pid_docid_map.json")
+        if self.docid_metadata_map is not None:
+            self._write_collection_to_file(self.docid_metadata_map, self.index_path + "/docid_metadata_map.json")
 
         print(f"Successfully deleted documents with these IDs: {document_ids}")
 
     def index(
         self,
-        collection_with_ids: List[dict],
-        document_metadata_dict: Optional[dict] = None,
+        collection: List[str],
+        pid_docid_map: Dict[int, str],
+        docid_metadata_map: Optional[dict] = None,
         index_name: Optional["str"] = None,
         max_document_length: int = 256,
         overwrite: Union[bool, str] = "reuse",
@@ -273,8 +270,7 @@ class ColBERT(LateInteractionModel):
                 )
             self.index_name = self.checkpoint + "new_index"
 
-        self.collection_with_ids = collection_with_ids
-        self.collection = [x["content"] for x in self.collection_with_ids]
+        self.collection = collection
 
         nbits = 2
         if len(self.collection) < 5000:
@@ -300,14 +296,24 @@ class ColBERT(LateInteractionModel):
             / self.index_name
         )
         self._write_collection_to_file(
-            self.collection_with_ids, self.index_path + "/collection.json"
+            self.collection, self.index_path + "/collection.json"
         )
 
-        if document_metadata_dict is not None:
+        self.pid_docid_map = pid_docid_map
+        self._write_collection_to_file(
+            self.pid_docid_map, self.index_path + "/pid_docid_map.json"
+        )
+
+        # inverted mapping for returning full docs
+        self.docid_pid_map = defaultdict(list)
+        for pid, docid in self.pid_docid_map.items():
+            self.docid_pid_map[docid].append(pid)
+
+        if docid_metadata_map is not None:
             self._write_collection_to_file(
-                document_metadata_dict, self.index_path + "/document_metadata.json"
+                docid_metadata_map, self.index_path + "/docid_metadata_map.json"
             )
-            self.document_metadata_dict = document_metadata_dict
+            self.docid_metadata_map = docid_metadata_map
 
         print("Done indexing!")
 
@@ -368,6 +374,7 @@ class ColBERT(LateInteractionModel):
         k: int = 10,
         force_fast: bool = False,
         zero_index_ranks: bool = False,
+        return_entire_document: bool = False,
     ):
         if self.searcher is None or (
             index_name is not None and self.index_name != index_name
@@ -384,18 +391,26 @@ class ColBERT(LateInteractionModel):
         for result in results:
             result_for_query = []
             for id_, rank, score in zip(*result):
-                document_id = self.collection_with_ids[id_]["document_id"]
+                document_id = self.pid_docid_map[id_]
                 result_dict = {
-                    "content": self.collection_with_ids[id_]["content"],
+                    "content": self.collection[id_],
                     "score": score,
                     "rank": rank - 1 if zero_index_ranks else rank,
                     "document_id": document_id,
                 }
-                if self.document_metadata_dict is not None:
-                    if document_id in self.document_metadata_dict:
-                        doc_metadata = self.document_metadata_dict[document_id]
+
+                if self.docid_metadata_map is not None:
+                    if document_id in self.docid_metadata_map:
+                        doc_metadata = self.docid_metadata_map[document_id]
                         result_dict["document_metadata"] = doc_metadata
+
+                if return_entire_document:
+                    pids = self.docid_pid_map[document_id]
+                    filtered_collection = [self.collection[pid] for pid in pids]
+                    result_dict["entire_document"] = " ".join(filtered_collection)
+
                 result_for_query.append(result_dict)
+
             to_return.append(result_for_query)
 
         if len(to_return) == 1:

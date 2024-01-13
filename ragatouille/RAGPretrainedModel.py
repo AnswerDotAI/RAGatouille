@@ -9,6 +9,7 @@ from ragatouille.integrations import (
     RAGatouilleLangChainRetriever,
     RAGatouilleLangChainCompressor,
 )
+from uuid import uuid4
 
 
 class RAGPretrainedModel:
@@ -94,8 +95,8 @@ class RAGPretrainedModel:
 
     def index(
         self,
-        documents: list[str],
-        document_ids: Union[TypeVar("T"), List[TypeVar("T")]],
+        collection: list[str],
+        document_ids: Union[TypeVar("T"), List[TypeVar("T")]] = None,
         document_metadatas: Optional[list[dict]] = None,
         index_name: str = None,
         overwrite_index: bool = True,
@@ -107,9 +108,8 @@ class RAGPretrainedModel:
         """Build an index from a list of documents.
 
         Parameters:
-            documents (list[str]): The list of documents to index.
+            collection (list[str]): The collection of documents to index.
             document_ids (Optional[list[str]]): An optional list of document ids. Ids will be generated at index time if not supplied.
-            document_metadatas (Optional[list[dict]]): An optional list of metadata dicts
             index_name (str): The name of the index that will be built.
             overwrite_index (bool): Whether to overwrite an existing index with the same name.
             max_document_length (int): The maximum length of a document. Documents longer than this will be split into chunks.
@@ -121,14 +121,28 @@ class RAGPretrainedModel:
             index (str): The path to the index that was built.
         """
 
-        if len(document_ids) != len(documents):
-            raise ValueError("Document IDs and documents must be the same length.")
+        if document_ids is None:
+            document_ids = [str(uuid4()) for _ in range(len(collection))]
+        else:
+            if len(document_ids) != len(collection):
+                raise ValueError("document_ids must be the same length as collection")
+            if len(document_ids) != len(set(document_ids)):
+                raise ValueError("document_ids must be unique")
+            if any(not id.strip() for id in document_ids):
+                raise ValueError("document_ids must not contain empty strings")
+            if not all(isinstance(id, type(document_ids[0])) for id in document_ids):
+                raise ValueError("All document_ids must be of the same type")
 
-        if len(set(document_ids)) != len(document_ids):
-            raise ValueError("Document IDs must be unique.")
-        
-        if document_metadatas is not None and len(document_metadatas) != len(documents):
-            raise ValueError("Document metadata and documents must be the same length.")
+        if document_metadatas is not None:
+            if len(document_metadatas) != len(collection):
+                raise ValueError(
+                    "document_metadatas must be the same length as collection"
+                )
+            docid_metadata_map = {
+                x: y for x, y in zip(document_ids, document_metadatas)
+            }
+        else:
+            docid_metadata_map = None
 
         if split_documents or preprocessing_fn is not None:
             self.corpus_processor = CorpusProcessor(
@@ -136,29 +150,28 @@ class RAGPretrainedModel:
                 preprocessing_fn=preprocessing_fn,
             )
             collection_with_ids = self.corpus_processor.process_corpus(
-                documents,
+                collection,
                 document_ids,
                 chunk_size=max_document_length,
             )
         else:
             collection_with_ids = [
                 {"document_id": x, "content": y}
-                for x, y in zip(document_ids, documents)
+                for x, y in zip(document_ids, collection)
             ]
 
-        if document_metadatas is not None:
-            document_metadata_dict = {
-                x: y for x, y in zip(document_ids, document_metadatas)
-            }
-        else:
-            document_metadata_dict = None
+        pid_docid_map = {
+            index: item["document_id"] for index, item in enumerate(collection_with_ids)
+        }
+        collection = [x["content"] for x in collection_with_ids]
 
         overwrite = "reuse"
         if overwrite_index:
             overwrite = True
         return self.model.index(
-            collection_with_ids,
-            document_metadata_dict=document_metadata_dict,
+            collection,
+            pid_docid_map=pid_docid_map,
+            docid_metadata_map=docid_metadata_map,
             index_name=index_name,
             max_document_length=max_document_length,
             overwrite=overwrite,
@@ -166,7 +179,7 @@ class RAGPretrainedModel:
 
     def add_to_index(
         self,
-        new_documents: list[str],
+        new_collection: list[str],
         new_document_ids: Union[TypeVar("T"), List[TypeVar("T")]],
         new_document_metadatas: Optional[list[dict]] = None,
         index_name: Optional[str] = None,
@@ -177,44 +190,62 @@ class RAGPretrainedModel:
         """Add documents to an existing index.
 
         Parameters:
-            new_documents (list[str]): The documents to add to the index.
-            new_document_ids (Union[TypeVar("T"), List[TypeVar("T")]]): The IDs of the documents to add to the index.
+            new_collection (list[str]): The documents to add to the index.
             new_document_metadatas (Optional[list[dict]]): An optional list of metadata dicts
             index_name (Optional[str]): The name of the index to add documents to. If None and by default, will add documents to the already initialised one.
         """
+        if new_document_ids is None:
+            new_document_ids = [str(uuid4()) for _ in range(len(new_collection))]
+        else:
+            if len(new_document_ids) != len(new_collection):
+                raise ValueError("document_ids must be the same length as collection")
+            if len(new_document_ids) != len(set(new_document_ids)):
+                raise ValueError("document_ids must be unique")
+            if any(not id.strip() for id in new_document_ids):
+                raise ValueError("document_ids must not contain empty strings")
+            if not all(
+                isinstance(id, type(new_document_ids[0])) for id in new_document_ids
+            ):
+                raise ValueError("All document_ids must be of the same type")
 
-        if len(new_document_ids) != len(new_documents):
-            raise ValueError("Document IDs and documents must be the same length.")
-
-        if len(set(new_document_ids)) != len(new_document_ids):
-            raise ValueError("New document IDs must be unique.")
+        if new_document_metadatas is not None:
+            if len(new_document_metadatas) != len(new_collection):
+                raise ValueError(
+                    "new_document_metadatas must be the same length as new_collection"
+                )
+            new_docid_metadata_map = {
+                x: y for x, y in zip(new_document_ids, new_document_metadatas)
+            }
+        else:
+            new_docid_metadata_map = None
 
         if split_documents or preprocessing_fn is not None:
             self.corpus_processor = CorpusProcessor(
                 document_splitter_fn=document_splitter_fn if split_documents else None,
                 preprocessing_fn=preprocessing_fn,
             )
-            new_documents_with_ids = self.corpus_processor.process_corpus(
-                new_documents,
+            new_collection_with_ids = self.corpus_processor.process_corpus(
+                new_collection,
                 new_document_ids,
                 chunk_size=self.model.config.doc_maxlen,
             )
         else:
-            new_documents_with_ids = [
+            new_collection_with_ids = [
                 {"document_id": x, "content": y}
-                for x, y in zip(new_document_ids, new_documents)
+                for x, y in zip(new_document_ids, new_collection)
             ]
 
-        if new_document_metadatas is not None:
-            new_document_metadata_dict = {
-                x: y for x, y in zip(new_document_ids, new_document_metadatas)
-            }
-        else:
-            new_document_metadata_dict = None
+        new_collection = [x["content"] for x in new_collection_with_ids]
+
+        new_pid_docid_map = {
+            index: item["document_id"]
+            for index, item in enumerate(new_collection_with_ids)
+        }
 
         self.model.add_to_index(
-            new_documents_with_ids,
-            new_document_metadata_dict=new_document_metadata_dict,
+            new_collection,
+            new_pid_docid_map,
+            new_docid_metadata_map=new_docid_metadata_map,
             index_name=index_name,
         )
 
