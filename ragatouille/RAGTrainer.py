@@ -43,7 +43,9 @@ class RAGTrainer:
         self.pretrained_model_name = pretrained_model_name
         self.language_code = language_code
         self.model = ColBERT(
-            pretrained_model_name_or_path=pretrained_model_name, n_gpu=n_usable_gpus
+            pretrained_model_name_or_path=pretrained_model_name,
+            n_gpu=n_usable_gpus,
+            training_mode=True,
         )
 
     def add_documents(self, documents: list[str]):

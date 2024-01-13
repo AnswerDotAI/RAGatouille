@@ -21,6 +21,7 @@ class ColBERT(LateInteractionModel):
         index_name: Optional[str] = None,
         verbose: int = 1,
         load_from_index: bool = False,
+        training_mode: bool = False,
         **kwargs,
     ):
         self.verbose = verbose
@@ -59,7 +60,10 @@ class ColBERT(LateInteractionModel):
         self.config.experiment = "colbert"
         self.config.root = ".ragatouille/"
 
-        self.inference_ckpt = Checkpoint(self.checkpoint, colbert_config=self.config)
+        if not training_mode:
+            self.inference_ckpt = Checkpoint(
+                self.checkpoint, colbert_config=self.config
+            )
 
         self.run_context = Run().context(self.run_config)
         self.run_context.__enter__()  # Manually enter the context
