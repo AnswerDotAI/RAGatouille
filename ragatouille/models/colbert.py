@@ -1,14 +1,14 @@
 import math
-from typing import Union, Optional, Literal
-import os
 import time
 from pathlib import Path
-from colbert.infra import Run, ColBERTConfig, RunConfig
-from colbert import Indexer, Searcher, Trainer, IndexUpdater
-from colbert.modeling.checkpoint import Checkpoint
-import torch
-import srsly
+from typing import Literal, Optional, Union
+
 import numpy as np
+import srsly
+import torch
+from colbert import Indexer, IndexUpdater, Searcher, Trainer
+from colbert.infra import ColBERTConfig, Run, RunConfig
+from colbert.modeling.checkpoint import Checkpoint
 
 from ragatouille.models.base import LateInteractionModel
 

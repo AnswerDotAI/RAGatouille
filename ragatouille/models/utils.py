@@ -10,7 +10,7 @@ from colbert.infra import ColBERTConfig
 from colbert.modeling.colbert import ColBERT
 from huggingface_hub import HfApi
 from huggingface_hub.utils import HfHubHTTPError
-from transformers import BertPreTrainedModel, AutoModel
+from transformers import AutoModel, BertPreTrainedModel
 
 
 def seeded_shuffle(collection: list, seed: int = 42):
