@@ -1,12 +1,12 @@
 from pathlib import Path
-from typing import Union, Literal, Optional
+from typing import Literal, Optional, Union
 
 from colbert.infra import ColBERTConfig
 
-from ragatouille.models import LateInteractionModel, ColBERT
+from ragatouille.data import TrainingDataProcessor
+from ragatouille.models import ColBERT, LateInteractionModel
 from ragatouille.negative_miners import HardNegativeMiner, SimpleMiner
 from ragatouille.utils import seeded_shuffle
-from ragatouille.data import TrainingDataProcessor
 
 
 class RAGTrainer:

@@ -5,5 +5,5 @@ from .training_data_processor import TrainingDataProcessor
 __all__ = [
     "TrainingDataProcessor",
     "CorpusProcessor",
-    "llama_index_sentence_splitter"
+    "llama_index_sentence_splitter",
 ]

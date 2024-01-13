@@ -1,10 +1,11 @@
 from enum import Enum
 from pathlib import Path
-from typing import Literal, Union, Optional
-from sentence_transformers import SentenceTransformer
+from typing import Literal, Optional, Union
+
 import torch
-from voyager import Index, Space, StorageDataType
+from sentence_transformers import SentenceTransformer
 from tqdm import tqdm
+from voyager import Index, Space, StorageDataType
 
 from .base import HardNegativeMiner
 

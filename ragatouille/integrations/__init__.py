@@ -1,6 +1,6 @@
 from ragatouille.integrations._langchain import (
-    RAGatouilleLangChainRetriever,
     RAGatouilleLangChainCompressor,
+    RAGatouilleLangChainRetriever,
 )
 
 __all__ = ["RAGatouilleLangChainRetriever", "RAGatouilleLangChainCompressor"]

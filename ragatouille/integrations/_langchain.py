@@ -1,8 +1,9 @@
-from typing import Any, Optional, List, Sequence
+from typing import Any, List, Optional, Sequence
+
+from langchain.retrievers.document_compressors.base import BaseDocumentCompressor
 from langchain_core.callbacks.manager import CallbackManagerForRetrieverRun, Callbacks
 from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
-from langchain.retrievers.document_compressors.base import BaseDocumentCompressor
 
 
 class RAGatouilleLangChainRetriever(BaseRetriever):
@@ -13,7 +14,7 @@ class RAGatouilleLangChainRetriever(BaseRetriever):
         self,
         query: str,
         *,
-        run_manager: CallbackManagerForRetrieverRun,
+        run_manager: CallbackManagerForRetrieverRun,  # noqa
     ) -> List[Document]:
         """Get documents relevant to a query."""
         docs = self.model.search(query, **self.kwargs)
@@ -34,7 +35,7 @@ class RAGatouilleLangChainCompressor(BaseDocumentCompressor):
         self,
         documents: Sequence[Document],
         query: str,
-        callbacks: Optional[Callbacks] = None,
+        callbacks: Optional[Callbacks] = None,  # noqa
         **kwargs,
     ) -> Any:
         """Rerank a list of documents relevant to a query."""
