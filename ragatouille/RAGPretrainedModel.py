@@ -3,6 +3,7 @@ from typing import Any, Callable, Optional, Union
 
 from langchain.retrievers.document_compressors.base import BaseDocumentCompressor
 from langchain_core.retrievers import BaseRetriever
+from huggingface_hub import hf_hub_download
 
 from ragatouille.data.corpus_processor import CorpusProcessor
 from ragatouille.data.preprocessors import llama_index_sentence_splitter
@@ -84,6 +85,32 @@ class RAGPretrainedModel:
         """
         instance = cls()
         index_path = Path(index_path)
+        instance.model = ColBERT(
+            index_path, n_gpu, verbose=verbose, load_from_index=True
+        )
+
+        return instance
+
+    @classmethod
+    def from_prebuilt_index(
+        cls, repo_id: str, n_gpu: int = -1, verbose: int = 1
+    ):
+        """Load an Index and the associated ColBERT encoder from an existing document index.
+
+        Parameters:
+            repo_id (str): The Hugging Face repository ID (e.g., 'username/repo').
+            n_gpu (int): Number of GPUs to use. By default, value is -1, which means use all available GPUs or none if no GPU is available.
+            verbose (int): The level of ColBERT verbosity requested. By default, 1, which will filter out most internal logs.
+
+        Returns:
+            cls (RAGPretrainedModel): The current instance of RAGPretrainedModel, with the model and index initialised.
+        """
+        instance = cls()
+
+        # Download the index file from Hugging Face Hub
+        index_path = hf_hub_download(repo_id=repo_id, filename=f"{repo_id}/index")
+        index_path = Path(index_path)
+
         instance.model = ColBERT(
             index_path, n_gpu, verbose=verbose, load_from_index=True
         )
