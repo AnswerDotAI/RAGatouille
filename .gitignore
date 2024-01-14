@@ -99,6 +99,8 @@ venv.bak/
 # mkdocs documentation
 /site
 
+.ragatouille
+
 # mypy
 .mypy_cache/
 .dmypy.json
