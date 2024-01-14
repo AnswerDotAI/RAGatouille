@@ -38,11 +38,15 @@ class ColBERT(LateInteractionModel):
             self.run_config = RunConfig(
                 nranks=n_gpu, experiment=self.config.experiment, root=self.config.root
             )
+            split_root = str(pretrained_model_name_or_path).split("/")[:-1]
+            self.config.root = "/".join(split_root)
             self.checkpoint = self.config.checkpoint
             self.index_name = self.config.index_name
             self.collection = self._get_collection_from_file(
                 str(pretrained_model_name_or_path / "collection.json")
             )
+            # TODO: Modify root assignment when loading from HF
+
         else:
             ckpt_config = ColBERTConfig.load_from_checkpoint(
                 str(pretrained_model_name_or_path)
@@ -57,8 +61,8 @@ class ColBERT(LateInteractionModel):
             )
             self.checkpoint = pretrained_model_name_or_path
             self.index_name = index_name
-        self.config.experiment = "colbert"
-        self.config.root = ".ragatouille/"
+            self.config.experiment = "colbert"
+            self.config.root = ".ragatouille/"
 
         if not training_mode:
             self.inference_ckpt = Checkpoint(
@@ -105,6 +109,7 @@ class ColBERT(LateInteractionModel):
             config=None,
             collection=self.collection,
             index=self.index_name,
+            index_root=self.config.root,
             verbose=self.verbose,
         )
         new_documents = list(set(new_documents))
@@ -232,6 +237,7 @@ class ColBERT(LateInteractionModel):
             checkpoint=self.checkpoint,
             config=None,
             collection=self.collection,
+            index_root=self.config.root,
             index=self.index_name,
         )
 
