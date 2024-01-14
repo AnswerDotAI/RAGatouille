@@ -550,13 +550,13 @@ s3 = ["boto3"]
 
 [[package]]
 name = "colbert-ai"
-version = "0.2.15"
+version = "0.2.16"
 description = "Efficient and Effective Passage Search via Contextualized Late Interaction over BERT"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "colbert-ai-0.2.15.tar.gz", hash = "sha256:ad3266871e9a8719b1352019cac1cd8caa23b735c351d50ff9445137a05c4969"},
-    {file = "colbert_ai-0.2.15-py3-none-any.whl", hash = "sha256:231c91a0c68a6e07a1105023e1deeb9d230709870a019d21334027ea0bcd1977"},
+    {file = "colbert-ai-0.2.16.tar.gz", hash = "sha256:ed7d87797d1993b9e34df0d0c3854ae75b796aff506108f96f4ae7af62f7cf96"},
+    {file = "colbert_ai-0.2.16-py3-none-any.whl", hash = "sha256:51e1698d62ad20c022e452765f5ad0057dfc455161c2f3b74bd7a8b587f5565e"},
 ]
 
 [package.dependencies]
@@ -4718,4 +4718,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "a1c002d0367979465f64cf5d1040d652bb90da26c4eca1b7c14b919c808d7232"
+content-hash = "05103255fb71c49affce90af6bead6653bd67814340152d78d1ebcee350cd5c5"
