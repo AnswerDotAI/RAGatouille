@@ -192,6 +192,9 @@ class ColBERT(LateInteractionModel):
         self.config = ColBERTConfig.from_existing(
             self.config, ColBERTConfig(nbits=nbits)
         )
+
+        # Instruct colbert-ai to disable forking if nranks == 1
+        self.config.avoid_fork_if_possible = True
         self.indexer = Indexer(
             checkpoint=self.checkpoint,
             config=self.config,
