@@ -50,6 +50,10 @@ class ColBERT(LateInteractionModel):
             self.pid_docid_map = self._get_collection_from_file(
                 str(pretrained_model_name_or_path / "pid_docid_map.json")
             )
+            # convert all keys to int when loading from file because saving converts to str
+            self.pid_docid_map = {
+                int(key): value for key, value in self.pid_docid_map.items()
+            }
             self.docid_pid_map = defaultdict(list)
             for pid, docid in self.pid_docid_map.items():
                 self.docid_pid_map[docid].append(pid)
@@ -374,7 +378,6 @@ class ColBERT(LateInteractionModel):
         k: int = 10,
         force_fast: bool = False,
         zero_index_ranks: bool = False,
-        return_entire_document: bool = False,
     ):
         if self.searcher is None or (
             index_name is not None and self.index_name != index_name
@@ -403,11 +406,6 @@ class ColBERT(LateInteractionModel):
                     if document_id in self.docid_metadata_map:
                         doc_metadata = self.docid_metadata_map[document_id]
                         result_dict["document_metadata"] = doc_metadata
-
-                if return_entire_document:
-                    pids = self.docid_pid_map[document_id]
-                    filtered_collection = [self.collection[pid] for pid in pids]
-                    result_dict["entire_document"] = " ".join(filtered_collection)
 
                 result_for_query.append(result_dict)
 

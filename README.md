@@ -117,18 +117,29 @@ To create an index, you'll need to load a trained model, this can be one of your
 ```python
 from ragatouille import RAGPretrainedModel
 from ragatouille.utils import get_wikipedia_page
-from ragatouille.data import CorpusProcessor
-
 
 RAG = RAGPretrainedModel.from_pretrained("colbert-ir/colbertv2.0")
 my_documents = [get_wikipedia_page("Hayao_Miyazaki"), get_wikipedia_page("Studio_Ghibli")]
-my_document_ids = ["hayao_miyazaki", "studio_ghibli"]
-processor = CorpusProcessor()
-my_documents = processor.process_corpus(my_documents)
-index_path = RAG.index(index_name="my_index", documents=my_documents, my_document_ids=my_document_ids)
+index_path = RAG.index(index_name="my_index", collection=my_documents)
+```
+You can also optionally add document IDs or document metadata when creating the index:
+
+```python
+document_ids = ["miyazaki", "ghibli"]
+document_metadatas = [
+    {"entity": "person", "source": "wikipedia"},
+    {"entity": "organisation", "source": "wikipedia"},
+]
+index_path = RAG.index(
+    index_name="my_index_with_ids_and_metadata",
+    collection=my_documents,
+    document_ids=document_ids,
+    document_metadatas=document_metadatas,
+)
 ```
 
 Once this is done running, your index will be saved on-disk and ready to be queried! RAGatouille and ColBERT handle everything here:
+- Splitting your documents
 - Tokenizing your documents
 - Identifying the individual terms
 - Embedding the documents and generating the bags-of-embeddings
@@ -192,7 +203,15 @@ index_name="my_index")
     ],
  ],
 ```
-
+If your index includes document metadata, it'll be returned as a dictionary in the `document_metadata` key of the result dictionary:
+    
+```python
+[
+    {"content": "blablabla", "score": 42.424242, "rank": 1, "document_id": "x", "document_metadata": {"A": 1, "B": 2}},
+    ...,
+    {"content": "albalbalba", "score": 24.242424, "rank": k, "document_id": "y", "document_metadata": {"A": 3, "B": 4}},
+]
+```
 
 ## I'm sold, can I integrate late-interaction RAG into my project?
 

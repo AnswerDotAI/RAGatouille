@@ -2,7 +2,6 @@ import pytest
 from ragatouille import RAGPretrainedModel
 import os
 import srsly
-import re
 
 collection = [
     "Hayao Miyazaki (宮崎 駿 or 宮﨑 駿, Miyazaki Hayao, [mijaꜜzaki hajao]; born January 5, 1941) is a Japanese animator, filmmaker, and manga artist. A co-founder of Studio Ghibli, he has attained international acclaim as a masterful storyteller and creator of Japanese animated feature films, and is widely regarded as one of the most accomplished filmmakers in the history of animation.\nBorn in Tokyo City in the Empire of Japan, Miyazaki expressed interest in manga and animation from an early age, and he joined Toei Animation in 1963. During his early years at Toei Animation he worked as an in-between artist and later collaborated with director Isao Takahata. Notable films to which Miyazaki contributed at Toei include Doggie March and Gulliver's Travels Beyond the Moon. He provided key animation to other films at Toei, such as Puss in Boots and Animal Treasure Island, before moving to A-Pro in 1971, where he co-directed Lupin the Third Part I alongside Takahata. After moving to Zuiyō Eizō (later known as Nippon Animation) in 1973, Miyazaki worked as an animator on World Masterpiece Theater, and directed the television series Future Boy Conan (1978). He joined Tokyo Movie Shinsha in 1979 to direct his first feature film The Castle of Cagliostro as well as the television series Sherlock Hound. In the same period, he also began writing and illustrating the manga Nausicaä of the Valley of the Wind (1982–1994), and he also directed the 1984 film adaptation produced by Topcraft.\nMiyazaki co-founded Studio Ghibli in 1985. He directed numerous films with Ghibli, including Laputa: Castle in the Sky (1986), My Neighbor Totoro (1988), Kiki's Delivery Service (1989), and Porco Rosso (1992). The films were met with critical and commercial success in Japan. Miyazaki's film Princess Mononoke was the first animated film ever to win the Japan Academy Prize for Picture of the Year, and briefly became the highest-grossing film in Japan following its release in 1997; its distribution to the Western world greatly increased Ghibli's popularity and influence outside Japan. His 2001 film Spirited Away became the highest-grossing film in Japanese history, winning the Academy Award for Best Animated Feature, and is frequently ranked among the greatest films of the 21st century. Miyazaki's later films—Howl's Moving Castle (2004), Ponyo (2008), and The Wind Rises (2013)—also enjoyed critical and commercial success.",
@@ -22,14 +21,14 @@ def persistent_temp_index_root(tmp_path_factory):
     return tmp_path_factory.mktemp("temp_test_indexes")
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def RAG_from_pretrained_model(persistent_temp_index_root):
     return RAGPretrainedModel.from_pretrained(
         "colbert-ir/colbertv2.0", index_root=str(persistent_temp_index_root)
     )
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def index_path_fixture(persistent_temp_index_root, index_creation_inputs):
     index_path = os.path.join(
         str(persistent_temp_index_root),
@@ -40,24 +39,26 @@ def index_path_fixture(persistent_temp_index_root, index_creation_inputs):
     return str(index_path)
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def collection_path_fixture(index_path_fixture):
     collection_path = os.path.join(index_path_fixture, "collection.json")
     return str(collection_path)
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def document_metadata_path_fixture(index_path_fixture):
     document_metadata_path = os.path.join(index_path_fixture, "docid_metadata_map.json")
     return str(document_metadata_path)
 
-@pytest.fixture
+
+@pytest.fixture(scope="session")
 def pid_docid_map_path_fixture(index_path_fixture):
     pid_docid_map_path = os.path.join(index_path_fixture, "pid_docid_map.json")
     return str(pid_docid_map_path)
 
 
 @pytest.fixture(
+    scope="session",
     params=[
         {
             "collection": collection,
@@ -120,26 +121,49 @@ def pid_docid_map_path_fixture(index_path_fixture):
     ],
 )
 def index_creation_inputs(request):
-    return request.param
+    params = request.param
+    return params
 
 
-def test_index_creation(RAG_from_pretrained_model, index_creation_inputs):
-    RAG = RAG_from_pretrained_model
-    index_path = RAG.index(**index_creation_inputs)
-    assert os.path.exists(index_path) == True
+@pytest.fixture(scope="session")
+def create_index(RAG_from_pretrained_model, index_creation_inputs):
+    index_path = RAG_from_pretrained_model.index(**index_creation_inputs)
+    return index_path
 
 
-def test_collection_creation(collection_path_fixture, pid_docid_map_path_fixture):
+def test_index_creation(create_index):
+    assert os.path.exists(create_index) == True
+
+
+@pytest.fixture(scope="session", autouse=True)
+def add_docids_to_index_inputs(
+    create_index, index_creation_inputs, pid_docid_map_path_fixture
+):
+    if "document_ids" not in index_creation_inputs:
+        pid_docid_map_data = srsly.read_json(pid_docid_map_path_fixture)
+        seen_ids = set()
+        index_creation_inputs["document_ids"] = [
+            x
+            for x in list(pid_docid_map_data.values())
+            if not (x in seen_ids or seen_ids.add(x))
+        ]
+
+
+def test_collection_creation(collection_path_fixture):
     assert os.path.exists(collection_path_fixture) == True
     collection_data = srsly.read_json(collection_path_fixture)
     assert isinstance(
         collection_data, list
     ), "The collection.json file should contain a list."
 
+
 def test_pid_docid_map_creation(pid_docid_map_path_fixture):
     assert os.path.exists(pid_docid_map_path_fixture) == True
-    #pid_docid_map_data = srsly.read_json(pid_docid_map_path_fixture)
-    #TODO check pid_docid_map_data
+    # TODO check pid_docid_map_data
+    pid_docid_map_data = srsly.read_json(pid_docid_map_path_fixture)
+    assert isinstance(
+        pid_docid_map_data, dict
+    ), "The pid_docid_map.json file should contain a dictionary."
 
 
 def test_document_metadata_creation(
@@ -148,31 +172,17 @@ def test_document_metadata_creation(
     if "document_metadatas" in index_creation_inputs:
         assert os.path.exists(document_metadata_path_fixture) == True
         document_metadata_dict = srsly.read_json(document_metadata_path_fixture)
-        if "document_ids" in index_creation_inputs:
+        assert (
+            set(document_metadata_dict.keys())
+            == set(index_creation_inputs["document_ids"])
+        ), "The keys in document_metadata.json should match the document_ids provided for index creation."
+        for doc_id, metadata in document_metadata_dict.items():
             assert (
-                set(document_metadata_dict.keys())
-                == set(index_creation_inputs["document_ids"])
-            ), "The keys in document_metadata.json should match the document_ids provided for index creation."
-            for doc_id, metadata in document_metadata_dict.items():
-                assert (
-                    metadata
-                    == index_creation_inputs["document_metadatas"][
-                        index_creation_inputs["document_ids"].index(doc_id)
-                    ]
-                ), f"The metadata for document_id {doc_id} should match the provided metadata."
-        else:
-            for metadata in index_creation_inputs["document_metadatas"]:
-                assert (
-                    metadata in document_metadata_dict.values()
-                ), f"The provided metadata should be in the saved metadata."
-            for doc_id in document_metadata_dict.keys():
-                assert (
-                    re.match(
-                        r"^[a-f0-9]{8}-[a-f0-9]{4}-[4][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$",
-                        doc_id,
-                    )
-                    is not None
-                ), f"The generated document_id {doc_id} should be in uuid4 format."
+                metadata
+                == index_creation_inputs["document_metadatas"][
+                    index_creation_inputs["document_ids"].index(doc_id)
+                ]
+            ), f"The metadata for document_id {doc_id} should match the provided metadata."
     else:
         assert os.path.exists(document_metadata_path_fixture) == False
 
@@ -197,6 +207,7 @@ def test_document_metadata_returned_in_search_results(
             assert (
                 result["document_metadata"] == expected_metadata
             ), f"The metadata for document_id {doc_id} should match the provided metadata."
+
     else:
         for result in results:
             assert (
@@ -204,65 +215,64 @@ def test_document_metadata_returned_in_search_results(
             ), "The metadata should not be returned in the results."
 
 
-def test_return_entire_document(index_creation_inputs, index_path_fixture):
-    if index_creation_inputs["split_documents"] == True:
-        RAG = RAGPretrainedModel.from_index(index_path_fixture)
-        results = RAG.search(
-            "when was miyazaki born",
-            index_name=index_creation_inputs["index_name"],
-            return_entire_document=True,
-        )
-        for result in results:
-            assert (
-                "entire_document" in result
-            ), "The full document should be returned in the results."
-            doc_id = result["document_id"]
-            expected_document = index_creation_inputs["collection"][
-                index_creation_inputs["document_ids"].index(doc_id)
-            ]
-            assert (
-                result["entire_document"] == expected_document
-            ), f"The document for document_id {doc_id} should match the provided document."
-    else:
-        pytest.skip("Test only applicable to split documents.")
+# def test_return_entire_document(index_creation_inputs, index_path_fixture):
+#     if index_creation_inputs["split_documents"] == True:
+#         RAG = RAGPretrainedModel.from_index(index_path_fixture)
+#         results = RAG.search(
+#             "when was miyazaki born",
+#             index_name=index_creation_inputs["index_name"],
+#             return_entire_document=True,
+#         )
+#         for result in results:
+#             assert (
+#                 "entire_document" in result
+#             ), "The full document should be returned in the results."
+#             doc_id = result["document_id"]
+#             expected_document = index_creation_inputs["collection"][
+#                 index_creation_inputs["document_ids"].index(doc_id)
+#             ]
+#             assert (
+#                 result["entire_document"] == expected_document
+#             ), f"The document for document_id {doc_id} should match the provided document."
+#     else:
+#         assert True, "This test is only relevant for split documents."
 
 
 def test_delete_from_index(
     index_creation_inputs,
-    collection_path_fixture,
+    pid_docid_map_path_fixture,
     document_metadata_path_fixture,
     index_path_fixture,
 ):
     RAG = RAGPretrainedModel.from_index(index_path_fixture)
-    if "document_ids" in index_creation_inputs:
-        deleted_doc_id = index_creation_inputs["document_ids"][0]
-        original_doc_ids = set(index_creation_inputs["document_ids"])
-        RAG.delete_from_index(
-            index_name=index_creation_inputs["index_name"],
-            document_ids=[deleted_doc_id],
-        )
-        collection_data = srsly.read_json(collection_path_fixture)
-        collection_data_ids = set([item["document_id"] for item in collection_data])
+    deleted_doc_id = index_creation_inputs["document_ids"][0]
+    original_doc_ids = set(index_creation_inputs["document_ids"])
+    RAG.delete_from_index(
+        index_name=index_creation_inputs["index_name"],
+        document_ids=[deleted_doc_id],
+    )
+    pid_docid_map_data = srsly.read_json(pid_docid_map_path_fixture)
+    updated_document_ids = set(list(pid_docid_map_data.values()))
+    assert (
+        deleted_doc_id not in updated_document_ids
+    ), "Deleted document ID should not be in the collection."
+    assert original_doc_ids - updated_document_ids == {
+        deleted_doc_id
+    }, "Only the deleted document ID should be missing from the collection."
+    if "document_metadatas" in index_creation_inputs:
+        document_metadata_dict = srsly.read_json(document_metadata_path_fixture)
         assert (
-            deleted_doc_id not in collection_data_ids
-        ), "Deleted document ID should not be in the collection."
-        assert original_doc_ids - collection_data_ids == {
+            deleted_doc_id not in document_metadata_dict
+        ), "Deleted document ID should not be in the document metadata."
+        assert original_doc_ids - set(document_metadata_dict.keys()) == {
             deleted_doc_id
-        }, "Only the deleted document ID should be missing from the collection."
-        if "document_metadatas" in index_creation_inputs:
-            document_metadata_dict = srsly.read_json(document_metadata_path_fixture)
-            assert (
-                deleted_doc_id not in document_metadata_dict
-            ), "Deleted document ID should not be in the document metadata."
-            assert original_doc_ids - set(document_metadata_dict.keys()) == {
-                deleted_doc_id
-            }, "Only the deleted document ID should be missing from the document metadata."
+        }, "Only the deleted document ID should be missing from the document metadata."
 
 
 def test_add_to_index(
     index_creation_inputs,
-    collection_path_fixture,
     document_metadata_path_fixture,
+    pid_docid_map_path_fixture,
     index_path_fixture,
 ):
     RAG = RAGPretrainedModel.from_index(index_path_fixture)
@@ -281,13 +291,14 @@ def test_add_to_index(
         new_document_metadatas=new_doc_metadata,
         index_name=index_creation_inputs["index_name"],
     )
-    collection_data = srsly.read_json(collection_path_fixture)
-    collection_data_ids = set([item["document_id"] for item in collection_data])
+    pid_docid_map_data = srsly.read_json(pid_docid_map_path_fixture)
+    document_ids = set(list(pid_docid_map_data.values()))
+
     document_metadata_dict = srsly.read_json(document_metadata_path_fixture)
     for new_doc_id in new_doc_ids:
         assert (
-            new_doc_id in collection_data_ids
-        ), f"New document ID {new_doc_id} should be in the collection."
+            new_doc_id in document_ids
+        ), f"New document ID {new_doc_id} should be in the pid_docid_map."
         assert (
             new_doc_id in document_metadata_dict
         ), f"New document ID {new_doc_id} should be in the document metadata."

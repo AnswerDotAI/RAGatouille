@@ -123,3 +123,5 @@ archive/
 */.ragatouille
 
 local/
+
+.vscode/
