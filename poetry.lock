@@ -550,13 +550,13 @@ s3 = ["boto3"]
 
 [[package]]
 name = "colbert-ai"
-version = "0.2.16"
+version = "0.2.17"
 description = "Efficient and Effective Passage Search via Contextualized Late Interaction over BERT"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "colbert-ai-0.2.16.tar.gz", hash = "sha256:ed7d87797d1993b9e34df0d0c3854ae75b796aff506108f96f4ae7af62f7cf96"},
-    {file = "colbert_ai-0.2.16-py3-none-any.whl", hash = "sha256:51e1698d62ad20c022e452765f5ad0057dfc455161c2f3b74bd7a8b587f5565e"},
+    {file = "colbert-ai-0.2.17.tar.gz", hash = "sha256:05f56387ed2ce42b14c8f072837353c56aa0cc52964bed59c826d5e26f773b84"},
+    {file = "colbert_ai-0.2.17-py3-none-any.whl", hash = "sha256:53e35c81c95c55cf484d6620a30b59c576895184f054a1f9f47bac81d852e68a"},
 ]
 
 [package.dependencies]
@@ -1419,13 +1419,13 @@ requests = ">=2,<3"
 
 [[package]]
 name = "llama-index"
-version = "0.9.30"
+version = "0.9.31"
 description = "Interface between LLMs and your data"
 optional = false
 python-versions = ">=3.8.1,<4.0"
 files = [
-    {file = "llama_index-0.9.30-py3-none-any.whl", hash = "sha256:4e9e8430514d2afe6b1e9b4b26d8f98c9cb2c234acc01b4352263e8916aeb245"},
-    {file = "llama_index-0.9.30.tar.gz", hash = "sha256:42aba63845524f3b6f7f6573d468590bbbaaa98fc158c92a17c0cda0e097cc52"},
+    {file = "llama_index-0.9.31-py3-none-any.whl", hash = "sha256:b5a2394ac1463a687df7d37233abfc69924c0441b3984423e6f1653bcb1a3a59"},
+    {file = "llama_index-0.9.31.tar.gz", hash = "sha256:1a3018ab9aa05f7ef217c9dc6d95117cd9146f8211023e866da0b113c5b75b9f"},
 ]
 
 [package.dependencies]
@@ -1883,13 +1883,13 @@ files = [
 
 [[package]]
 name = "nest-asyncio"
-version = "1.5.8"
+version = "1.5.9"
 description = "Patch asyncio to allow nested event loops"
 optional = false
 python-versions = ">=3.5"
 files = [
-    {file = "nest_asyncio-1.5.8-py3-none-any.whl", hash = "sha256:accda7a339a70599cb08f9dd09a67e0c2ef8d8d6f4c07f96ab203f2ae254e48d"},
-    {file = "nest_asyncio-1.5.8.tar.gz", hash = "sha256:25aa2ca0d2a5b5531956b9e273b45cf664cae2b145101d73b86b199978d48fdb"},
+    {file = "nest_asyncio-1.5.9-py3-none-any.whl", hash = "sha256:61ec07ef052e72e3de22045b81b2cc7d71fceb04c568ba0b2e4b2f9f5231bec2"},
+    {file = "nest_asyncio-1.5.9.tar.gz", hash = "sha256:d1e1144e9c6e3e6392e0fcf5211cb1c8374b5648a98f1ebe48e5336006b41907"},
 ]
 
 [[package]]
@@ -4718,4 +4718,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "05103255fb71c49affce90af6bead6653bd67814340152d78d1ebcee350cd5c5"
+content-hash = "f0ad07ff31e9f6ffd40e4cfad92052ab814637d6dbef8360332dea14e1e4f542"
