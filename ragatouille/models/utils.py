@@ -2,7 +2,7 @@ import os
 import random
 import shutil
 from pathlib import Path
-from typing import Union
+from typing import Optional, Union
 
 import torch
 import torch.nn as nn
@@ -25,9 +25,12 @@ def seeded_shuffle(collection: list, seed: int = 42):
 def export_to_huggingface_hub(
     colbert_path: Union[str, Path],
     huggingface_repo_name: str,
+    index_path: Optional[str] = None,
     export_vespa_onnx: bool = False,
     use_tmp_dir: bool = False,
 ):
+    # TODO: If index_path is available, convert the index directory into Vespa Format (?) and push it too.
+
     # ensure model contains a valid ColBERT config before exporting
     colbert_config = ColBERTConfig.load_from_checkpoint(colbert_path)
     try:
