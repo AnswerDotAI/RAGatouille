@@ -71,45 +71,36 @@ class RAGPretrainedModel:
 
     @classmethod
     def from_index(
-        cls, index_path: Union[str, Path], n_gpu: int = -1, verbose: int = 1
+        cls, index_path: Union[str, Path], n_gpu: int = -1, verbose: int = 1, local_dir: Optional[str] = None
     ):
         """Load an Index and the associated ColBERT encoder from an existing document index.
 
         Parameters:
-            index_path (Union[str, path]): Path to the index.
+            repo_id (str): Path to the index (eg., ./my-index) or, The Hugging Face repository ID (e.g., 'username/repo').
             n_gpu (int): Number of GPUs to use. By default, value is -1, which means use all available GPUs or none if no GPU is available.
             verbose (int): The level of ColBERT verbosity requested. By default, 1, which will filter out most internal logs.
+            local_dir (Optional[str]): Local directory to download the index to, if not present locally.
 
         Returns:
             cls (RAGPretrainedModel): The current instance of RAGPretrainedModel, with the model and index initialised.
         """
         instance = cls()
         index_path = Path(index_path)
-        instance.model = ColBERT(
-            index_path, n_gpu, verbose=verbose, load_from_index=True
-        )
 
-        return instance
+        if not index_path.exists():
+            repo_id = index_path.name
+            if local_dir is None:
+                local_dir = f".ragatouille/indexes/{repo_id}"
 
-    @classmethod
-    def from_prebuilt_index(
-        cls, repo_id: str, n_gpu: int = -1, verbose: int = 1
-    ):
-        """Load an Index and the associated ColBERT encoder from an existing document index.
-
-        Parameters:
-            repo_id (str): The Hugging Face repository ID (e.g., 'username/repo').
-            n_gpu (int): Number of GPUs to use. By default, value is -1, which means use all available GPUs or none if no GPU is available.
-            verbose (int): The level of ColBERT verbosity requested. By default, 1, which will filter out most internal logs.
-
-        Returns:
-            cls (RAGPretrainedModel): The current instance of RAGPretrainedModel, with the model and index initialised.
-        """
-        instance = cls()
-
-        # Download the index file from Hugging Face Hub
-        index_path = hf_hub_download(repo_id=repo_id, filename=f"{repo_id}/index")
-        index_path = Path(index_path)
+            try:
+                index_path = hf_hub_download(
+                    repo_id=repo_id, 
+                    filename=f"{repo_id}/index",
+                    cache_dir=local_dir
+                )
+                index_path = Path(index_path)
+            except Exception:
+                raise OSError(f"Index not found locally or in the Hugging Face hub: {repo_id}")
 
         instance.model = ColBERT(
             index_path, n_gpu, verbose=verbose, load_from_index=True

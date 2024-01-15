@@ -20,6 +20,7 @@ langchain_core = "^0.1.4"
 colbert-ai = "^0.2.15"
 langchain = "^0.1.0"
 onnx = "^1.15.0"
+huggingface-hub = "^0.20.2"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"
