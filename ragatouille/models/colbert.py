@@ -210,6 +210,9 @@ class ColBERT(LateInteractionModel):
             / "indexes"
             / self.index_name
         )
+        self.config.root = str(
+            Path(self.run_config.root) / Path(self.run_config.experiment) / "indexes"
+        )
         self._write_collection_to_file(collection, index_path + "/collection.json")
         print("Done indexing!")
 
