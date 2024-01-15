@@ -200,6 +200,7 @@ class ColBERT(LateInteractionModel):
             config=self.config,
             verbose=self.verbose,
         )
+        self.indexer.configure(avoid_fork_if_possible=True)
         self.indexer.index(
             name=self.index_name, collection=collection, overwrite=overwrite
         )
