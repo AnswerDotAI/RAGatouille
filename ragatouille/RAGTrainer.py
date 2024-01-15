@@ -158,7 +158,7 @@ class RAGTrainer:
     ) -> str:
         """
         Launch training or fine-tuning of a ColBERT model.
-        
+
         Parameters:
             batch_size: int - Total batch size -- divice by n_usable_gpus for per-GPU batch size.
             nbits: int - number of bits used for vector compression by the traiened model. 2 is usually ideal.
