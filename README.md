@@ -161,23 +161,13 @@ results = RAG.search(query)
 ```
 
 This is the preferred way of doing things, since every index saves the full configuration of the model used to create it, and you can easily load it back up.
-However, if you'd rather do it yourself or want to use a slightly different configuration, you can spin-up an instance of `RAGPretrainedModel` and specify the index you want to use:
-
-```python
-from ragatouille import RAGPretrainedModel
-
-query = "What manga did Hayao Miyazaki write?"
-RAG = RAGPretrainedModel.from_pretrained("colbert-ir/colbertv2.0")
-results = RAG.search(query, index_name="my_index")
-```
 
 `RAG.search` is a flexible method! You can set the `k` value to however many results you want (it defaults to `10`), and you can also use it to search for multiple queries at once:
 
 ```python
 RAG.search(["What manga did Hayao Miyazaki write?",
 "Who are the founders of Ghibli?"
-"Who is the director of Spirited Away?"],
-index_name="my_index")
+"Who is the director of Spirited Away?"],)
 ```
 
 `RAG.search` returns results in the form of a list of dictionaries, or a list of list of dictionaries if you used multiple queries: 

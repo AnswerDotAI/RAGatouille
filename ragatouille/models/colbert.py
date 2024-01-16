@@ -35,6 +35,8 @@ class ColBERT(LateInteractionModel):
         if n_gpu == -1:
             n_gpu = 1 if torch.cuda.device_count() == 0 else torch.cuda.device_count()
 
+        self.loaded_from_index = load_from_index
+
         if load_from_index:
             self.index_path = str(pretrained_model_name_or_path)
             ckpt_config = ColBERTConfig.load_from_index(
@@ -122,12 +124,29 @@ class ColBERT(LateInteractionModel):
             "add_to_index support will be more thorough in future versions",
         )
 
+        if self.loaded_from_index:
+            index_root = self.config.root
+        else:
+            index_root = str(
+                Path(self.config.root) / Path(self.config.experiment) / "indexes"
+            )
+            if not self.collection:
+                self.collection = self._get_collection_from_file(
+                    str(
+                        Path(self.config.root)
+                        / Path(self.config.experiment)
+                        / "indexes"
+                        / self.index_name
+                        / "collection.json"
+                    )
+                )
+
         searcher = Searcher(
             checkpoint=self.checkpoint,
             config=None,
             collection=self.collection,
             index=self.index_name,
-            index_root=self.config.root,
+            index_root=index_root,
             verbose=self.verbose,
         )
 
