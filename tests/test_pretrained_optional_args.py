@@ -239,7 +239,7 @@ def test_document_metadata_returned_in_search_results(
 #     else:
 #         assert True, "This test is only relevant for split documents."
 
-
+# TODO: move this to a separate test file
 def test_delete_from_index(
     index_creation_inputs,
     pid_docid_map_path_fixture,
@@ -270,7 +270,7 @@ def test_delete_from_index(
             deleted_doc_id
         }, "Only the deleted document ID should be missing from the document metadata."
 
-
+# TODO: move this to a separate test file
 def test_add_to_index(
     index_creation_inputs,
     document_metadata_path_fixture,
