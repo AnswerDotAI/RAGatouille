@@ -110,9 +110,7 @@ class ColBERT(LateInteractionModel):
             index_root = self.config.root
         else:
             index_root = str(
-                Path(self.config.root)
-                / Path(self.config.experiment)
-                / "indexes"
+                Path(self.config.root) / Path(self.config.experiment) / "indexes"
             )
             if not self.collection:
                 self.collection = self._get_collection_from_file(
@@ -124,7 +122,6 @@ class ColBERT(LateInteractionModel):
                         / "collection.json"
                     )
                 )
-
 
         searcher = Searcher(
             checkpoint=self.checkpoint,
