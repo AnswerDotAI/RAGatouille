@@ -20,7 +20,9 @@ class CorpusProcessor:
     ) -> list[str]:
         # TODO CHECK KWARGS
         if self.document_splitter_fn is not None:
-            documents = self.document_splitter_fn(documents, document_ids, **splitter_kwargs)
+            documents = self.document_splitter_fn(
+                documents, document_ids, **splitter_kwargs
+            )
         if self.preprocessing_fn is not None:
             if isinstance(self.preprocessing_fn, list):
                 for fn in self.preprocessing_fn:
