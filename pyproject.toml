@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "RAGatouille"
-version = "0.0.4b2"
+version = "0.0.4b3"
 description = "Library to facilitate the use of state-of-the-art retrieval models in common RAG contexts."
 authors = ["Benjamin Clavie <ben@clavie.eu>"]
 readme = "README.md"
