@@ -248,19 +248,35 @@ class ColBERT(LateInteractionModel):
         updater.remove(pids_to_remove)
         updater.persist_to_disk()
 
-        self.collection = [doc for pid, doc in enumerate(self.collection) if pid not in pids_to_remove]
-        self.pid_docid_map = {pid: docid for pid, docid in self.pid_docid_map.items() if pid not in pids_to_remove}
+        self.collection = [
+            doc for pid, doc in enumerate(self.collection) if pid not in pids_to_remove
+        ]
+        self.pid_docid_map = {
+            pid: docid
+            for pid, docid in self.pid_docid_map.items()
+            if pid not in pids_to_remove
+        }
         self.docid_pid_map = defaultdict(list)
         for pid, docid in self.pid_docid_map.items():
             self.docid_pid_map[docid].append(pid)
 
         if self.docid_metadata_map is not None:
-            self.docid_metadata_map = {docid: metadata for docid, metadata in self.docid_metadata_map.items() if docid not in document_ids}
+            self.docid_metadata_map = {
+                docid: metadata
+                for docid, metadata in self.docid_metadata_map.items()
+                if docid not in document_ids
+            }
 
-        self._write_collection_to_file(self.collection, self.index_path + "/collection.json")
-        self._write_collection_to_file(self.pid_docid_map, self.index_path + "/pid_docid_map.json")
+        self._write_collection_to_file(
+            self.collection, self.index_path + "/collection.json"
+        )
+        self._write_collection_to_file(
+            self.pid_docid_map, self.index_path + "/pid_docid_map.json"
+        )
         if self.docid_metadata_map is not None:
-            self._write_collection_to_file(self.docid_metadata_map, self.index_path + "/docid_metadata_map.json")
+            self._write_collection_to_file(
+                self.docid_metadata_map, self.index_path + "/docid_metadata_map.json"
+            )
 
         print(f"Successfully deleted documents with these IDs: {document_ids}")
 

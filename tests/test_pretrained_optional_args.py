@@ -139,7 +139,9 @@ def test_index_creation(create_index):
 
 @pytest.fixture(scope="session", autouse=True)
 def add_docids_to_index_inputs(
-    create_index, index_creation_inputs, pid_docid_map_path_fixture # noqa: ARG001
+    create_index,  # noqa: ARG001
+    index_creation_inputs,
+    pid_docid_map_path_fixture,
 ):
     if "document_ids" not in index_creation_inputs:
         pid_docid_map_data = srsly.read_json(pid_docid_map_path_fixture)
@@ -239,6 +241,7 @@ def test_document_metadata_returned_in_search_results(
 #     else:
 #         assert True, "This test is only relevant for split documents."
 
+
 # TODO: move this to a separate test file
 def test_delete_from_index(
     index_creation_inputs,
@@ -269,6 +272,7 @@ def test_delete_from_index(
         assert original_doc_ids - set(document_metadata_dict.keys()) == {
             deleted_doc_id
         }, "Only the deleted document ID should be missing from the document metadata."
+
 
 # TODO: move this to a separate test file
 def test_add_to_index(
