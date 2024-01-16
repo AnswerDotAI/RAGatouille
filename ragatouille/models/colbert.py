@@ -1,8 +1,9 @@
 import math
+import os
 import time
-from typing import Union, Optional, TypeVar, List, Dict, Literal
+from collections import defaultdict
 from pathlib import Path
-from typing import Literal, Optional, Union
+from typing import Dict, List, Literal, Optional, TypeVar, Union
 
 import numpy as np
 import srsly
@@ -10,10 +11,6 @@ import torch
 from colbert import Indexer, IndexUpdater, Searcher, Trainer
 from colbert.infra import ColBERTConfig, Run, RunConfig
 from colbert.modeling.checkpoint import Checkpoint
-import torch
-import srsly
-import numpy as np
-from collections import defaultdict
 
 from ragatouille.models.base import LateInteractionModel
 

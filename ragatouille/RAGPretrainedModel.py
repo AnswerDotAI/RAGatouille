@@ -1,5 +1,6 @@
 from pathlib import Path
-from typing import Callable, Optional, Union, List, Any, TypeVar
+from typing import Any, Callable, List, Optional, TypeVar, Union
+from uuid import uuid4
 
 from langchain.retrievers.document_compressors.base import BaseDocumentCompressor
 from langchain_core.retrievers import BaseRetriever
@@ -10,7 +11,6 @@ from ragatouille.integrations import (
     RAGatouilleLangChainCompressor,
     RAGatouilleLangChainRetriever,
 )
-from uuid import uuid4
 from ragatouille.models import ColBERT, LateInteractionModel
 
 
