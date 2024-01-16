@@ -139,7 +139,7 @@ def test_index_creation(create_index):
 
 @pytest.fixture(scope="session", autouse=True)
 def add_docids_to_index_inputs(
-    create_index, index_creation_inputs, pid_docid_map_path_fixture
+    create_index, index_creation_inputs, pid_docid_map_path_fixture # noqa: ARG001
 ):
     if "document_ids" not in index_creation_inputs:
         pid_docid_map_data = srsly.read_json(pid_docid_map_path_fixture)
