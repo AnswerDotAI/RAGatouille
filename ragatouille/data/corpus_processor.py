@@ -1,4 +1,5 @@
 from typing import Callable, Optional, Union
+
 from ragatouille.data.preprocessors import llama_index_sentence_splitter
 
 

@@ -1,12 +1,12 @@
 from pathlib import Path
-from typing import Union, Literal, Optional
+from typing import Literal, Optional, Union
 
 from colbert.infra import ColBERTConfig
 
-from ragatouille.models import LateInteractionModel, ColBERT
+from ragatouille.data import TrainingDataProcessor
+from ragatouille.models import ColBERT, LateInteractionModel
 from ragatouille.negative_miners import HardNegativeMiner, SimpleMiner
 from ragatouille.utils import seeded_shuffle
-from ragatouille.data import TrainingDataProcessor
 
 
 class RAGTrainer:
@@ -43,7 +43,9 @@ class RAGTrainer:
         self.pretrained_model_name = pretrained_model_name
         self.language_code = language_code
         self.model = ColBERT(
-            pretrained_model_name_or_path=pretrained_model_name, n_gpu=n_usable_gpus
+            pretrained_model_name_or_path=pretrained_model_name,
+            n_gpu=n_usable_gpus,
+            training_mode=True,
         )
 
     def add_documents(self, documents: list[str]):
@@ -156,10 +158,11 @@ class RAGTrainer:
     ) -> str:
         """
         Launch training or fine-tuning of a ColBERT model.
+
         Parameters:
             batch_size: int - Total batch size -- divice by n_usable_gpus for per-GPU batch size.
             nbits: int - number of bits used for vector compression by the traiened model. 2 is usually ideal.
-            maxsteps: int - End training early afte maxsteps steps.
+            maxsteps: int - End training early after maxsteps steps.
             use_ib_negatives: bool - Whether to use in-batch negatives to calculate loss or not.
             learning_rate: float - ColBERT litterature usually has this performing best between 3e-6 - 2e-5 depending on data size
             dim: int - Size of individual vector representations.

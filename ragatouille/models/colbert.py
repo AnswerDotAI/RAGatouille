@@ -1,10 +1,14 @@
 import math
-import os
 import time
 from typing import Union, Optional, TypeVar, List, Dict, Literal
 from pathlib import Path
-from colbert.infra import Run, ColBERTConfig, RunConfig
-from colbert import Indexer, Searcher, Trainer, IndexUpdater
+from typing import Literal, Optional, Union
+
+import numpy as np
+import srsly
+import torch
+from colbert import Indexer, IndexUpdater, Searcher, Trainer
+from colbert.infra import ColBERTConfig, Run, RunConfig
 from colbert.modeling.checkpoint import Checkpoint
 import torch
 import srsly
@@ -22,6 +26,7 @@ class ColBERT(LateInteractionModel):
         index_name: Optional[str] = None,
         verbose: int = 1,
         load_from_index: bool = False,
+        training_mode: bool = False,
         index_root: Optional[str] = None,
         **kwargs,
     ):
@@ -42,6 +47,8 @@ class ColBERT(LateInteractionModel):
             self.run_config = RunConfig(
                 nranks=n_gpu, experiment=self.config.experiment, root=self.config.root
             )
+            split_root = str(pretrained_model_name_or_path).split("/")[:-1]
+            self.config.root = "/".join(split_root)
             self.checkpoint = self.config.checkpoint
             self.index_name = self.config.index_name
             self.collection = self._get_collection_from_file(
@@ -63,6 +70,8 @@ class ColBERT(LateInteractionModel):
                 self.docid_metadata_map = self._get_collection_from_file(
                     str(pretrained_model_name_or_path / "docid_metadata_map.json")
                 )
+            # TODO: Modify root assignment when loading from HF
+
         else:
             self.index_root = index_root if index_root is not None else ".ragatouille/"
             ckpt_config = ColBERTConfig.load_from_checkpoint(
@@ -78,10 +87,13 @@ class ColBERT(LateInteractionModel):
             )
             self.checkpoint = pretrained_model_name_or_path
             self.index_name = index_name
-        self.config.experiment = "colbert"
-        self.config.root = ".ragatouille/"
+            self.config.experiment = "colbert"
+            self.config.root = ".ragatouille/"
 
-        self.inference_ckpt = Checkpoint(self.checkpoint, colbert_config=self.config)
+        if not training_mode:
+            self.inference_ckpt = Checkpoint(
+                self.checkpoint, colbert_config=self.config
+            )
 
         self.run_context = Run().context(self.run_config)
         self.run_context.__enter__()  # Manually enter the context
@@ -118,6 +130,7 @@ class ColBERT(LateInteractionModel):
             config=None,
             collection=self.collection,
             index=self.index_name,
+            index_root=self.config.root,
             verbose=self.verbose,
         )
 
@@ -284,11 +297,15 @@ class ColBERT(LateInteractionModel):
         self.config = ColBERTConfig.from_existing(
             self.config, ColBERTConfig(nbits=nbits)
         )
+
+        # Instruct colbert-ai to disable forking if nranks == 1
+        self.config.avoid_fork_if_possible = True
         self.indexer = Indexer(
             checkpoint=self.checkpoint,
             config=self.config,
             verbose=self.verbose,
         )
+        self.indexer.configure(avoid_fork_if_possible=True)
         self.indexer.index(
             name=self.index_name, collection=self.collection, overwrite=overwrite
         )
@@ -298,6 +315,9 @@ class ColBERT(LateInteractionModel):
             / Path(self.run_config.experiment)
             / "indexes"
             / self.index_name
+        )
+        self.config.root = str(
+            Path(self.run_config.root) / Path(self.run_config.experiment) / "indexes"
         )
         self._write_collection_to_file(
             self.collection, self.index_path + "/collection.json"
@@ -350,6 +370,7 @@ class ColBERT(LateInteractionModel):
             checkpoint=self.checkpoint,
             config=None,
             collection=self.collection,
+            index_root=self.config.root,
             index=self.index_name,
         )
 

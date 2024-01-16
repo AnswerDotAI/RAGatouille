@@ -1,15 +1,17 @@
-from typing import Callable, Optional, Union, List, Any, TypeVar
 from pathlib import Path
-from langchain_core.retrievers import BaseRetriever
+from typing import Callable, Optional, Union, List, Any, TypeVar
+
 from langchain.retrievers.document_compressors.base import BaseDocumentCompressor
+from langchain_core.retrievers import BaseRetriever
+
 from ragatouille.data.corpus_processor import CorpusProcessor
 from ragatouille.data.preprocessors import llama_index_sentence_splitter
-from ragatouille.models import LateInteractionModel, ColBERT
 from ragatouille.integrations import (
-    RAGatouilleLangChainRetriever,
     RAGatouilleLangChainCompressor,
+    RAGatouilleLangChainRetriever,
 )
 from uuid import uuid4
+from ragatouille.models import ColBERT, LateInteractionModel
 
 
 class RAGPretrainedModel:

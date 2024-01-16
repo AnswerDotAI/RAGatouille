@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "RAGatouille"
-version = "0.0.4a2"
+version = "0.0.4b2"
 description = "Library to facilitate the use of state-of-the-art retrieval models in common RAG contexts."
 authors = ["Benjamin Clavie <ben@clavie.eu>"]
 readme = "README.md"
@@ -17,7 +17,7 @@ sentence-transformers = "^2.2.2"
 torch = "^2.0.1"
 llama-index = "^0.9.24"
 langchain_core = "^0.1.4"
-colbert-ai = "^0.2.15"
+colbert-ai = "0.2.17"
 langchain = "^0.1.0"
 onnx = "^1.15.0"
 
@@ -32,3 +32,68 @@ ruff = "^0.1.9"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore::Warning"
+]
+
+[tool.ruff]
+# Exclude a variety of commonly ignored directories.
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "*.ipynb",
+    "examples",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "venv",
+]
+
+# Same as Black.
+line-length = 88
+output-format = "grouped"
+
+target-version = "py39"
+
+[tool.ruff.lint]
+select = [
+  # bugbear rules
+  "B",
+  "I",
+  # remove unused imports
+  "F401",
+  # bare except statements
+  "E722",
+  # unused arguments
+  "ARG",
+]
+ignore = [
+  "B006",
+  "B018",
+]
+
+unfixable = [
+  "T201",
+  "T203",
+]
+ignore-init-module-imports = true
+
+[tool.ruff.lint.isort]
+section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
