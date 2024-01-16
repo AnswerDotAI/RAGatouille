@@ -213,13 +213,15 @@ class ColBERT(LateInteractionModel):
         )
 
         # Instruct colbert-ai to disable forking if nranks == 1
-        self.config.avoid_fork_if_possible = True
+        if self.config.nranks > 1 and not torch.cuda.is_available():
+            self.config.avoid_fork_if_possible = True
         self.indexer = Indexer(
             checkpoint=self.checkpoint,
             config=self.config,
             verbose=self.verbose,
         )
-        self.indexer.configure(avoid_fork_if_possible=True)
+        if self.config.nranks > 1 and not torch.cuda.is_available():
+            self.indexer.configure(avoid_fork_if_possible=True)
         self.indexer.index(
             name=self.index_name, collection=collection, overwrite=overwrite
         )
