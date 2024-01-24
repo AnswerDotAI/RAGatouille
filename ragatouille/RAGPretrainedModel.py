@@ -102,7 +102,7 @@ class RAGPretrainedModel:
         collection_len: int,
     ) -> tuple[list[str], Optional[dict[Any, Any]]]:
         if document_ids is None:
-            document_ids = [str(str(uuid4())) for i in range(collection_len)]
+            document_ids = [str(uuid4()) for i in range(collection_len)]
         else:
             if len(document_ids) != collection_len:
                 raise ValueError("document_ids must be the same length as collection")
