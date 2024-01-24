@@ -158,10 +158,11 @@ class RAGTrainer:
     ) -> str:
         """
         Launch training or fine-tuning of a ColBERT model.
+
         Parameters:
             batch_size: int - Total batch size -- divice by n_usable_gpus for per-GPU batch size.
             nbits: int - number of bits used for vector compression by the traiened model. 2 is usually ideal.
-            maxsteps: int - End training early afte maxsteps steps.
+            maxsteps: int - End training early after maxsteps steps.
             use_ib_negatives: bool - Whether to use in-batch negatives to calculate loss or not.
             learning_rate: float - ColBERT litterature usually has this performing best between 3e-6 - 2e-5 depending on data size
             dim: int - Size of individual vector representations.

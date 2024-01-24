@@ -117,17 +117,29 @@ To create an index, you'll need to load a trained model, this can be one of your
 ```python
 from ragatouille import RAGPretrainedModel
 from ragatouille.utils import get_wikipedia_page
-from ragatouille.data import CorpusProcessor
-
 
 RAG = RAGPretrainedModel.from_pretrained("colbert-ir/colbertv2.0")
 my_documents = [get_wikipedia_page("Hayao_Miyazaki"), get_wikipedia_page("Studio_Ghibli")]
-processor = CorpusProcessor()
-my_documents = processor.process_corpus(my_documents)
 index_path = RAG.index(index_name="my_index", collection=my_documents)
+```
+You can also optionally add document IDs or document metadata when creating the index:
+
+```python
+document_ids = ["miyazaki", "ghibli"]
+document_metadatas = [
+    {"entity": "person", "source": "wikipedia"},
+    {"entity": "organisation", "source": "wikipedia"},
+]
+index_path = RAG.index(
+    index_name="my_index_with_ids_and_metadata",
+    collection=my_documents,
+    document_ids=document_ids,
+    document_metadatas=document_metadatas,
+)
 ```
 
 Once this is done running, your index will be saved on-disk and ready to be queried! RAGatouille and ColBERT handle everything here:
+- Splitting your documents
 - Tokenizing your documents
 - Identifying the individual terms
 - Embedding the documents and generating the bags-of-embeddings
@@ -149,23 +161,13 @@ results = RAG.search(query)
 ```
 
 This is the preferred way of doing things, since every index saves the full configuration of the model used to create it, and you can easily load it back up.
-However, if you'd rather do it yourself or want to use a slightly different configuration, you can spin-up an instance of `RAGPretrainedModel` and specify the index you want to use:
-
-```python
-from ragatouille import RAGPretrainedModel
-
-query = "What manga did Hayao Miyazaki write?"
-RAG = RAGPretrainedModel.from_pretrained("colbert-ir/colbertv2.0")
-results = RAG.search(query, index_name="my_index")
-```
 
 `RAG.search` is a flexible method! You can set the `k` value to however many results you want (it defaults to `10`), and you can also use it to search for multiple queries at once:
 
 ```python
 RAG.search(["What manga did Hayao Miyazaki write?",
 "Who are the founders of Ghibli?"
-"Who is the director of Spirited Away?"],
-index_name="my_index")
+"Who is the director of Spirited Away?"],)
 ```
 
 `RAG.search` returns results in the form of a list of dictionaries, or a list of list of dictionaries if you used multiple queries: 
@@ -173,25 +175,33 @@ index_name="my_index")
 ```python
 # single-query result
 [
-    {"content": "blablabla", "score": 42.424242, "rank": 1},
+    {"content": "blablabla", "score": 42.424242, "rank": 1, "document_id": "x"},
     ...,
-    {"content": "albalbalba", "score": 24.242424, "rank": k},
+    {"content": "albalbalba", "score": 24.242424, "rank": k, "document_id": "y"},
 ]
 # multi-query result
 [
     [
-        {"content": "blablabla", "score": 42.424242, "rank": 1},
+        {"content": "blablabla", "score": 42.424242, "rank": 1, "document_id": "x"},
         ...,
-        {"content": "albalbalba", "score": 24.242424, "rank": k},
+        {"content": "albalbalba", "score": 24.242424, "rank": k, "document_id": "y"},
     ],
     [
-        {"content": "blablabla", "score": 42.424242, "rank": 1},
+        {"content": "blablabla", "score": 42.424242, "rank": 1, "document_id": "x"},
         ...,
-        {"content": "albalbalba", "score": 24.242424, "rank": k},
+        {"content": "albalbalba", "score": 24.242424, "rank": k, "document_id": "y"},
     ],
  ],
 ```
-
+If your index includes document metadata, it'll be returned as a dictionary in the `document_metadata` key of the result dictionary:
+    
+```python
+[
+    {"content": "blablabla", "score": 42.424242, "rank": 1, "document_id": "x", "document_metadata": {"A": 1, "B": 2}},
+    ...,
+    {"content": "albalbalba", "score": 24.242424, "rank": k, "document_id": "y", "document_metadata": {"A": 3, "B": 4}},
+]
+```
 
 ## I'm sold, can I integrate late-interaction RAG into my project?
 
