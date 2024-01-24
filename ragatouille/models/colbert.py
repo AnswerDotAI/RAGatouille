@@ -75,8 +75,8 @@ class ColBERT(LateInteractionModel):
                     "WARNING: Could not load pid_docid_map or docid_metadata_map from index!",
                     "This is likely because you are loading an old index.",
                 )
-                self.pid_docid_map = None
-                self.docid_metadata_map = None
+                self.pid_docid_map = defaultdict(lambda: None)
+                self.docid_metadata_map = defaultdict(lambda: None)
             # TODO: Modify root assignment when loading from HF
 
         else:
