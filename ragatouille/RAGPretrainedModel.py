@@ -214,7 +214,7 @@ class RAGPretrainedModel:
     def add_to_index(
         self,
         new_collection: list[str],
-        new_document_ids: Union[TypeVar("T"), List[TypeVar("T")]],
+        new_document_ids: Optional[Union[TypeVar("T"), List[TypeVar("T")]]] = None,
         new_document_metadatas: Optional[list[dict]] = None,
         index_name: Optional[str] = None,
         split_documents: bool = True,
