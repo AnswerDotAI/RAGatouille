@@ -95,6 +95,37 @@ class RAGPretrainedModel:
 
         return instance
 
+    def _process_metadata(
+        self,
+        document_ids: Optional[Union[TypeVar("T"), List[TypeVar("T")]]],
+        document_metadatas: Optional[list[dict[Any, Any]]],
+        collection_len: int,
+    ) -> tuple[list[str], Optional[dict[Any, Any]]]:
+        if document_ids is None:
+            document_ids = [str(str(uuid4())) for i in range(collection_len)]
+        else:
+            if len(document_ids) != collection_len:
+                raise ValueError("document_ids must be the same length as collection")
+            if len(document_ids) != len(set(document_ids)):
+                raise ValueError("document_ids must be unique")
+            if any(not id.strip() for id in document_ids):
+                raise ValueError("document_ids must not contain empty strings")
+            if not all(isinstance(id, type(document_ids[0])) for id in document_ids):
+                raise ValueError("All document_ids must be of the same type")
+
+        if document_metadatas is not None:
+            if len(document_metadatas) != collection_len:
+                raise ValueError(
+                    "document_metadatas must be the same length as collection"
+                )
+            docid_metadata_map = {
+                x: y for x, y in zip(document_ids, document_metadatas)
+            }
+        else:
+            docid_metadata_map = None
+
+        return document_ids, docid_metadata_map
+
     def index(
         self,
         collection: list[str],
@@ -123,28 +154,11 @@ class RAGPretrainedModel:
             index (str): The path to the index that was built.
         """
 
-        if document_ids is None:
-            document_ids = [str(uuid4()) for _ in range(len(collection))]
-        else:
-            if len(document_ids) != len(collection):
-                raise ValueError("document_ids must be the same length as collection")
-            if len(document_ids) != len(set(document_ids)):
-                raise ValueError("document_ids must be unique")
-            if any(not id.strip() for id in document_ids):
-                raise ValueError("document_ids must not contain empty strings")
-            if not all(isinstance(id, type(document_ids[0])) for id in document_ids):
-                raise ValueError("All document_ids must be of the same type")
-
-        if document_metadatas is not None:
-            if len(document_metadatas) != len(collection):
-                raise ValueError(
-                    "document_metadatas must be the same length as collection"
-                )
-            docid_metadata_map = {
-                x: y for x, y in zip(document_ids, document_metadatas)
-            }
-        else:
-            docid_metadata_map = None
+        document_ids, docid_metadata_map = self._process_metadata(
+            document_ids=document_ids,
+            document_metadatas=document_metadatas,
+            collection_len=len(collection),
+        )
 
         if split_documents or preprocessing_fn is not None:
             self.corpus_processor = CorpusProcessor(
@@ -196,30 +210,11 @@ class RAGPretrainedModel:
             new_document_metadatas (Optional[list[dict]]): An optional list of metadata dicts
             index_name (Optional[str]): The name of the index to add documents to. If None and by default, will add documents to the already initialised one.
         """
-        if new_document_ids is None:
-            new_document_ids = [str(uuid4()) for _ in range(len(new_collection))]
-        else:
-            if len(new_document_ids) != len(new_collection):
-                raise ValueError("document_ids must be the same length as collection")
-            if len(new_document_ids) != len(set(new_document_ids)):
-                raise ValueError("document_ids must be unique")
-            if any(not id.strip() for id in new_document_ids):
-                raise ValueError("document_ids must not contain empty strings")
-            if not all(
-                isinstance(id, type(new_document_ids[0])) for id in new_document_ids
-            ):
-                raise ValueError("All document_ids must be of the same type")
-
-        if new_document_metadatas is not None:
-            if len(new_document_metadatas) != len(new_collection):
-                raise ValueError(
-                    "new_document_metadatas must be the same length as new_collection"
-                )
-            new_docid_metadata_map = {
-                x: y for x, y in zip(new_document_ids, new_document_metadatas)
-            }
-        else:
-            new_docid_metadata_map = None
+        new_document_ids, new_docid_metadata_map = self._process_metadata(
+            document_ids=new_document_ids,
+            document_metadatas=new_document_metadatas,
+            collection_len=len(new_collection),
+        )
 
         if split_documents or preprocessing_fn is not None:
             self.corpus_processor = CorpusProcessor(

@@ -1,4 +1,5 @@
 from typing import Callable, Optional, Union
+from uuid import uuid4
 
 from ragatouille.data.preprocessors import llama_index_sentence_splitter
 
@@ -15,10 +16,15 @@ class CorpusProcessor:
     def process_corpus(
         self,
         documents: list[str],
-        document_ids: list[str],
+        document_ids: Optional[list[str]] = None,
         **splitter_kwargs,
     ) -> list[str]:
         # TODO CHECK KWARGS
+        document_ids = (
+            [str(uuid4()) for _ in range(len(documents))]
+            if document_ids is None
+            else document_ids
+        )
         if self.document_splitter_fn is not None:
             documents = self.document_splitter_fn(
                 documents, document_ids, **splitter_kwargs
