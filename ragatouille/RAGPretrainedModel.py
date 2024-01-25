@@ -1,9 +1,9 @@
 from pathlib import Path
 from typing import Any, Callable, Optional, Union
 
+from huggingface_hub import hf_hub_download
 from langchain.retrievers.document_compressors.base import BaseDocumentCompressor
 from langchain_core.retrievers import BaseRetriever
-from huggingface_hub import hf_hub_download
 
 from ragatouille.data.corpus_processor import CorpusProcessor
 from ragatouille.data.preprocessors import llama_index_sentence_splitter
@@ -12,6 +12,7 @@ from ragatouille.integrations import (
     RAGatouilleLangChainRetriever,
 )
 from ragatouille.models import ColBERT, LateInteractionModel
+from ragatouille.models.utils import upload_index_and_model
 
 
 class RAGPretrainedModel:
@@ -47,6 +48,7 @@ class RAGPretrainedModel:
     model_name: Union[str, None] = None
     model: Union[LateInteractionModel, None] = None
     corpus_processor: Optional[CorpusProcessor] = None
+    index_path: Union[Path, None] = None
 
     @classmethod
     def from_pretrained(
@@ -76,7 +78,7 @@ class RAGPretrainedModel:
         """Load an Index and the associated ColBERT encoder from an existing document index.
 
         Parameters:
-            repo_id (str): Path to the index (eg., ./my-index) or, The Hugging Face repository ID (e.g., 'username/repo').
+            index_path (Union[str, Path]): Path to the index (eg., ./my-index) or, The Hugging Face repository ID (e.g., 'username/repo').
             n_gpu (int): Number of GPUs to use. By default, value is -1, which means use all available GPUs or none if no GPU is available.
             verbose (int): The level of ColBERT verbosity requested. By default, 1, which will filter out most internal logs.
             local_dir (Optional[str]): Local directory to download the index to, if not present locally.
@@ -88,19 +90,19 @@ class RAGPretrainedModel:
         index_path = Path(index_path)
 
         if not index_path.exists():
-            repo_id = index_path.name
             if local_dir is None:
-                local_dir = f".ragatouille/indexes/{repo_id}"
+                local_dir = f".ragatouille/indexes/{index_path.name}"
 
+            repo_id = str(index_path)
             try:
                 index_path = hf_hub_download(
                     repo_id=repo_id, 
-                    filename=f"{repo_id}/index",
+                    filename=f"indexes/",
                     cache_dir=local_dir
                 )
-                index_path = Path(index_path)
-            except Exception:
-                raise OSError(f"Index not found locally or in the Hugging Face hub: {repo_id}")
+                instance.index_path = Path(index_path)
+            except Exception as e:
+                raise OSError(f"Index not found locally or in the Hugging Face hub: {repo_id}") from e
 
         instance.model = ColBERT(
             index_path, n_gpu, verbose=verbose, load_from_index=True
@@ -252,3 +254,23 @@ class RAGPretrainedModel:
         self, k: int = 5, **kwargs: Any
     ) -> BaseDocumentCompressor:
         return RAGatouilleLangChainCompressor(model=self, k=k, kwargs=kwargs)
+
+
+def upload_to_huggingface_hub(
+    self,
+    huggingface_repo_name: str,
+    use_tmp_dir: bool = True
+    ):
+    """Upload the given colbert model and 
+    """
+    if not self.model:
+        raise ValueError("Model is undefined. Specify the model before attempting to upload the index.")
+
+    colbert_path = self.model.pretrained_model_name_or_path
+
+    upload_index_and_model(
+        colbert_path=colbert_path,
+        huggingface_repo_name=huggingface_repo_name,
+        index_path=self.index_path,
+        use_tmp_dir=use_tmp_dir
+    )

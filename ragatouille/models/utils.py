@@ -25,7 +25,7 @@ def seeded_shuffle(collection: list, seed: int = 42):
 def export_to_huggingface_hub(
     colbert_path: Union[str, Path],
     huggingface_repo_name: str,
-    index_path: Optional[str] = None,
+    # index_path: Optional[str] = None,
     export_vespa_onnx: bool = False,
     use_tmp_dir: bool = False,
 ):
@@ -74,6 +74,80 @@ def export_to_huggingface_hub(
             )
 
         export_to_vespa_onnx(colbert_path, out_path=export_path)
+    try:
+        api = HfApi()
+        api.create_repo(repo_id=huggingface_repo_name, repo_type="model", exist_ok=True)
+        api.upload_folder(
+            folder_path=export_path,
+            repo_id=huggingface_repo_name,
+            repo_type="model",
+        )
+        print(f"Successfully uploaded model to {huggingface_repo_name}")
+    except ValueError as e:
+        print(
+            f"Could not create repository on the huggingface hub.\n",
+            f"Error: {e}\n",
+            "Please make sure you are logged in (run huggingface-cli login)\n",
+            "If the error persists, please open an issue on github. This is a beta feature!",
+        )
+    except HfHubHTTPError:
+        print(
+            "You don't seem to have the rights to create a repository with this name...\n",
+            "Please make sure your repo name is in the format 'yourusername/your-repo-name'",
+        )
+    finally:
+        if use_tmp_dir:
+            shutil.rmtree(export_path)
+
+
+def check_model_exists(model_name):
+    api = HfApi()
+    try:
+        _ = api.model_info(model_name)
+        return True
+    except Exception as e:
+        return False
+
+
+def upload_index_and_model(
+    colbert_path: Union[str, Path],
+    huggingface_repo_name: str,
+    index_path: Optional[Path] = None,
+    use_tmp_dir: bool = False,
+):
+    # ensure model contains a valid ColBERT config before exporting
+    colbert_config = ColBERTConfig.load_from_checkpoint(colbert_path)
+    try:
+        assert colbert_config is not None
+    except Exception as e:
+        print(f"Path {colbert_path} does not contain a valid ColBERT config!")
+        raise ValueError from e
+
+    export_path = colbert_path
+    if use_tmp_dir:
+        export_path = ".tmp/hugging_face_export"
+        print("Using tmp dir to store export files...")
+
+        model_name = colbert_config.checkpoint
+        # print(model_name)
+        if check_model_exists(model_name):
+            print(f"The model {model_name} already exists on Huggingface Hub.")
+        else:
+            colbert_model = ColBERT(
+                colbert_path,
+                colbert_config=colbert_config,
+            )
+            print(f"Model loaded... saving export files to disk at {export_path}")
+            try:
+                save_model = colbert_model.save
+            except Exception:
+                save_model = colbert_model.module.save
+            save_model(str(Path(export_path) / "model"))
+
+        # TODO: before exporting the index, we'd need to update the Index's config (in metadata.json) to make sure checkpoint points to path/to/your/index/model, so it loads properly!
+        colbert_config.checkpoint = str(index_path)
+        colbert_config.save(colbert_path, overwrite=True)
+
     try:
         api = HfApi()
         api.create_repo(repo_id=huggingface_repo_name, repo_type="model", exist_ok=True)
