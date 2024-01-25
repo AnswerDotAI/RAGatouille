@@ -53,22 +53,30 @@ class ColBERT(LateInteractionModel):
             self.collection = self._get_collection_from_file(
                 str(pretrained_model_name_or_path / "collection.json")
             )
-            self.pid_docid_map = self._get_collection_from_file(
-                str(pretrained_model_name_or_path / "pid_docid_map.json")
-            )
-            # convert all keys to int when loading from file because saving converts to str
-            self.pid_docid_map = {
-                int(key): value for key, value in self.pid_docid_map.items()
-            }
-            self.docid_pid_map = defaultdict(list)
-            for pid, docid in self.pid_docid_map.items():
-                self.docid_pid_map[docid].append(pid)
-            if os.path.exists(
-                str(pretrained_model_name_or_path / "docid_metadata_map.json")
-            ):
-                self.docid_metadata_map = self._get_collection_from_file(
-                    str(pretrained_model_name_or_path / "docid_metadata_map.json")
+            try:
+                self.pid_docid_map = self._get_collection_from_file(
+                    str(pretrained_model_name_or_path / "pid_docid_map.json")
                 )
+                # convert all keys to int when loading from file because saving converts to str
+                self.pid_docid_map = {
+                    int(key): value for key, value in self.pid_docid_map.items()
+                }
+                self.docid_pid_map = defaultdict(list)
+                for pid, docid in self.pid_docid_map.items():
+                    self.docid_pid_map[docid].append(pid)
+                if os.path.exists(
+                    str(pretrained_model_name_or_path / "docid_metadata_map.json")
+                ):
+                    self.docid_metadata_map = self._get_collection_from_file(
+                        str(pretrained_model_name_or_path / "docid_metadata_map.json")
+                    )
+            except Exception:
+                print(
+                    "WARNING: Could not load pid_docid_map or docid_metadata_map from index!",
+                    "This is likely because you are loading an old index.",
+                )
+                self.pid_docid_map = defaultdict(lambda: None)
+                self.docid_metadata_map = defaultdict(lambda: None)
             # TODO: Modify root assignment when loading from HF
 
         else:
