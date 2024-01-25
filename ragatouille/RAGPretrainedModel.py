@@ -1,5 +1,6 @@
 from pathlib import Path
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, List, Optional, TypeVar, Union
+from uuid import uuid4
 
 from huggingface_hub import hf_hub_download
 from langchain.retrievers.document_compressors.base import BaseDocumentCompressor
@@ -56,6 +57,7 @@ class RAGPretrainedModel:
         pretrained_model_name_or_path: Union[str, Path],
         n_gpu: int = -1,
         verbose: int = 1,
+        index_root: Optional[str] = None,
     ):
         """Load a ColBERT model from a pre-trained checkpoint.
 
@@ -63,12 +65,15 @@ class RAGPretrainedModel:
             pretrained_model_name_or_path (str): Local path or huggingface model name.
             n_gpu (int): Number of GPUs to use. By default, value is -1, which means use all available GPUs or none if no GPU is available.
             verbose (int): The level of ColBERT verbosity requested. By default, 1, which will filter out most internal logs.
+            index_root (Optional[str]): The root directory where indexes will be stored. If None, will use the default directory, '.ragatouille/'.
 
         Returns:
             cls (RAGPretrainedModel): The current instance of RAGPretrainedModel, with the model initialised.
         """
         instance = cls()
-        instance.model = ColBERT(pretrained_model_name_or_path, n_gpu, verbose=verbose)
+        instance.model = ColBERT(
+            pretrained_model_name_or_path, n_gpu, index_root=index_root, verbose=verbose
+        )
         return instance
 
     @classmethod
@@ -110,9 +115,42 @@ class RAGPretrainedModel:
 
         return instance
 
+    def _process_metadata(
+        self,
+        document_ids: Optional[Union[TypeVar("T"), List[TypeVar("T")]]],
+        document_metadatas: Optional[list[dict[Any, Any]]],
+        collection_len: int,
+    ) -> tuple[list[str], Optional[dict[Any, Any]]]:
+        if document_ids is None:
+            document_ids = [str(uuid4()) for i in range(collection_len)]
+        else:
+            if len(document_ids) != collection_len:
+                raise ValueError("document_ids must be the same length as collection")
+            if len(document_ids) != len(set(document_ids)):
+                raise ValueError("document_ids must be unique")
+            if any(not id.strip() for id in document_ids):
+                raise ValueError("document_ids must not contain empty strings")
+            if not all(isinstance(id, type(document_ids[0])) for id in document_ids):
+                raise ValueError("All document_ids must be of the same type")
+
+        if document_metadatas is not None:
+            if len(document_metadatas) != collection_len:
+                raise ValueError(
+                    "document_metadatas must be the same length as collection"
+                )
+            docid_metadata_map = {
+                x: y for x, y in zip(document_ids, document_metadatas)
+            }
+        else:
+            docid_metadata_map = None
+
+        return document_ids, docid_metadata_map
+
     def index(
         self,
         collection: list[str],
+        document_ids: Union[TypeVar("T"), List[TypeVar("T")]] = None,
+        document_metadatas: Optional[list[dict]] = None,
         index_name: str = None,
         overwrite_index: bool = True,
         max_document_length: int = 256,
@@ -120,38 +158,66 @@ class RAGPretrainedModel:
         document_splitter_fn: Optional[Callable] = llama_index_sentence_splitter,
         preprocessing_fn: Optional[Union[Callable, list[Callable]]] = None,
     ):
-        """Build an index from a collection of documents.
+        """Build an index from a list of documents.
 
         Parameters:
             collection (list[str]): The collection of documents to index.
+            document_ids (Optional[list[str]]): An optional list of document ids. Ids will be generated at index time if not supplied.
             index_name (str): The name of the index that will be built.
             overwrite_index (bool): Whether to overwrite an existing index with the same name.
+            max_document_length (int): The maximum length of a document. Documents longer than this will be split into chunks.
+            split_documents (bool): Whether to split documents into chunks.
+            document_splitter_fn (Optional[Callable]): A function to split documents into chunks. If None and by default, will use the llama_index_sentence_splitter.
+            preprocessing_fn (Optional[Union[Callable, list[Callable]]]): A function or list of functions to preprocess documents. If None and by default, will not preprocess documents.
 
         Returns:
             index (str): The path to the index that was built.
         """
+
+        document_ids, docid_metadata_map = self._process_metadata(
+            document_ids=document_ids,
+            document_metadatas=document_metadatas,
+            collection_len=len(collection),
+        )
+
         if split_documents or preprocessing_fn is not None:
             self.corpus_processor = CorpusProcessor(
                 document_splitter_fn=document_splitter_fn if split_documents else None,
                 preprocessing_fn=preprocessing_fn,
             )
-            collection = self.corpus_processor.process_corpus(
+            collection_with_ids = self.corpus_processor.process_corpus(
                 collection,
+                document_ids,
                 chunk_size=max_document_length,
             )
+        else:
+            collection_with_ids = [
+                {"document_id": x, "content": y}
+                for x, y in zip(document_ids, collection)
+            ]
+
+        pid_docid_map = {
+            index: item["document_id"] for index, item in enumerate(collection_with_ids)
+        }
+        collection = [x["content"] for x in collection_with_ids]
+
         overwrite = "reuse"
         if overwrite_index:
             overwrite = True
         return self.model.index(
             collection,
-            index_name,
+            pid_docid_map=pid_docid_map,
+            docid_metadata_map=docid_metadata_map,
+            index_name=index_name,
             max_document_length=max_document_length,
             overwrite=overwrite,
         )
 
     def add_to_index(
         self,
-        new_documents: list[str],
+        new_collection: list[str],
+        new_document_ids: Optional[Union[TypeVar("T"), List[TypeVar("T")]]] = None,
+        new_document_metadatas: Optional[list[dict]] = None,
         index_name: Optional[str] = None,
         split_documents: bool = True,
         document_splitter_fn: Optional[Callable] = llama_index_sentence_splitter,
@@ -160,21 +226,59 @@ class RAGPretrainedModel:
         """Add documents to an existing index.
 
         Parameters:
-            new_documents (list[str]): The documents to add to the index.
+            new_collection (list[str]): The documents to add to the index.
+            new_document_metadatas (Optional[list[dict]]): An optional list of metadata dicts
             index_name (Optional[str]): The name of the index to add documents to. If None and by default, will add documents to the already initialised one.
         """
+        new_document_ids, new_docid_metadata_map = self._process_metadata(
+            document_ids=new_document_ids,
+            document_metadatas=new_document_metadatas,
+            collection_len=len(new_collection),
+        )
+
         if split_documents or preprocessing_fn is not None:
             self.corpus_processor = CorpusProcessor(
                 document_splitter_fn=document_splitter_fn if split_documents else None,
                 preprocessing_fn=preprocessing_fn,
             )
-            new_documents = self.corpus_processor.process_corpus(
-                new_documents,
+            new_collection_with_ids = self.corpus_processor.process_corpus(
+                new_collection,
+                new_document_ids,
                 chunk_size=self.model.config.doc_maxlen,
             )
+        else:
+            new_collection_with_ids = [
+                {"document_id": x, "content": y}
+                for x, y in zip(new_document_ids, new_collection)
+            ]
+
+        new_collection = [x["content"] for x in new_collection_with_ids]
+
+        new_pid_docid_map = {
+            index: item["document_id"]
+            for index, item in enumerate(new_collection_with_ids)
+        }
 
         self.model.add_to_index(
-            new_documents,
+            new_collection,
+            new_pid_docid_map,
+            new_docid_metadata_map=new_docid_metadata_map,
+            index_name=index_name,
+        )
+
+    def delete_from_index(
+        self,
+        document_ids: Union[TypeVar("T"), List[TypeVar("T")]],
+        index_name: Optional[str] = None,
+    ):
+        """Delete documents from an index by their IDs.
+
+        Parameters:
+            document_ids (Union[TypeVar("T"), List[TypeVar("T")]]): The IDs of the documents to delete.
+            index_name (Optional[str]): The name of the index to delete documents from. If None and by default, will delete documents from the already initialised one.
+        """
+        self.model.delete_from_index(
+            document_ids,
             index_name=index_name,
         )
 
@@ -197,12 +301,17 @@ class RAGPretrainedModel:
             zero_index_ranks (bool): Whether to zero the index ranks of the results. By default, result rank 1 is the highest ranked result
 
         Returns:
-            results (Union[list[dict], list[list[dict]]]): A list of dict containing individual results for each query. If a list of queries is provided, returns a list of lists of dicts. Each result is a dict with keys `content`, `score` and `rank`.
+            results (Union[list[dict], list[list[dict]]]): A list of dict containing individual results for each query. If a list of queries is provided, returns a list of lists of dicts. Each result is a dict with keys `content`, `score`, `rank`, and 'document_id'. If metadata was indexed for the document, it will be returned under the "document_metadata" key.
 
         Individual results are always in the format:
         ```python3
-        {"content": "text of the relevant passage", "score": 0.123456, "rank": 1}
+        {"content": "text of the relevant passage", "score": 0.123456, "rank": 1, "document_id": "x"}
         ```
+        or
+        ```python3
+        {"content": "text of the relevant passage", "score": 0.123456, "rank": 1, "document_id": "x", "document_metadata": {"metadata_key": "metadata_value", ...}}
+        ```
+
         """
         return self.model.search(
             query=query,
