@@ -336,6 +336,58 @@ class RAGPretrainedModel:
             bsize=bsize,
         )
 
+    def encode(
+        self,
+        documents: list[str],
+        bsize: int = 32,
+        document_metadatas: Optional[list[dict]] = None,
+    ):
+        """Encode documents in memory to be searched through with no Index. Performance degrades rapidly with more documents.
+
+        Parameters:
+            documents (list[str]): The documents to encode.
+            bsize (int): The batch size to use for encoding.
+            document_metadatas (Optional[list[dict]]): An optional list of metadata dicts. Each entry must correspond to a document.
+        """
+
+        print(f"Encoding {len(documents)} documents...")
+        self.model.encode(
+            documents=documents,
+            bsize=bsize,
+            document_metadatas=document_metadatas,
+        )
+        print("Documents encoded!")
+
+    def search_encoded_docs(
+        self,
+        query: Union[str, list[str]],
+        k: int = 10,
+        bsize: int = 32,
+    ) -> list[dict[str, Any]]:
+        """Search through documents encoded in-memory.
+
+        Parameters:
+            query (Union[str, list[str]]): The query or list of queries to search for.
+            k (int): The number of results to return for each query.
+            batch_size (int): The batch size to use for searching.
+
+        Returns:
+            results (list[dict[str, Any]]): A list of dict containing individual results for each query. If a list of queries is provided, returns a list of lists of dicts.
+        """
+        return self.model.search_encoded_docs(
+            queries=query,
+            k=k,
+            bsize=bsize,
+        )
+
+    def clear_encoded_docs(self, force: bool = False):
+        """Clear documents encoded in-memory.
+
+        Parameters:
+            force (bool): Whether to force the clearing of encoded documents without enforcing a 10s wait time.
+        """
+        self.model.clear_encoded_docs(force=force)
+
     def as_langchain_retriever(self, **kwargs: Any) -> BaseRetriever:
         return RAGatouilleLangChainRetriever(model=self, kwargs=kwargs)
 
