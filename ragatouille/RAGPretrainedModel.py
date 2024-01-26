@@ -78,7 +78,11 @@ class RAGPretrainedModel:
 
     @classmethod
     def from_index(
-        cls, index_path: Union[str, Path], n_gpu: int = -1, verbose: int = 1, local_dir: Optional[str] = None
+        cls,
+        index_path: Union[str, Path],
+        n_gpu: int = -1,
+        verbose: int = 1,
+        local_dir: Optional[str] = None,
     ):
         """Load an Index and the associated ColBERT encoder from an existing document index.
 
@@ -92,28 +96,49 @@ class RAGPretrainedModel:
             cls (RAGPretrainedModel): The current instance of RAGPretrainedModel, with the model and index initialised.
         """
         instance = cls()
-        index_path = Path(index_path)
 
-        if not index_path.exists():
-            if local_dir is None:
-                local_dir = f".ragatouille/indexes/{index_path.name}"
-
-            repo_id = str(index_path)
-            try:
-                index_path = hf_hub_download(
-                    repo_id=repo_id, 
-                    filename=f"indexes/",
-                    cache_dir=local_dir
-                )
-                instance.index_path = Path(index_path)
-            except Exception as e:
-                raise OSError(f"Index not found locally or in the Hugging Face hub: {repo_id}") from e
+        # Check if index_path refers to a path or a huggingface model
+        resolved_index_path = cls._resolve_index_path(index_path, local_dir)
 
         instance.model = ColBERT(
-            index_path, n_gpu, verbose=verbose, load_from_index=True
+            resolved_index_path, n_gpu, verbose=verbose, load_from_index=True
         )
 
         return instance
+
+    @staticmethod
+    def _resolve_index_path(
+        index_path: Union[str, Path], local_dir: Optional[str]
+    ) -> Path:
+        """
+        Resolve whether the index_path is a local path or a Hugging Face model identifier.
+
+        Parameters:
+            index_path (Union[str, Path]): The index path or Hugging Face model identifier.
+            local_dir (Optional[str]): The local directory to use for storing the index.
+
+        Returns:
+            Path: The resolved local path to the index.
+        """
+        index_path = Path(index_path)
+        if local_dir is None:
+            local_dir = f".ragatouille/indexes/{str(index_path)}"
+
+        if index_path.is_dir():
+            return index_path
+        else:
+            try:
+                return Path(
+                    hf_hub_download(
+                        repo_id=str(index_path),
+                        filename="indexes/",
+                        cache_dir=local_dir,
+                    )
+                )
+            except Exception as e:
+                raise OSError(
+                    f"Index not found locally or in the Hugging Face hub: {index_path}"
+                ) from e
 
     def _process_metadata(
         self,
@@ -365,21 +390,16 @@ class RAGPretrainedModel:
         return RAGatouilleLangChainCompressor(model=self, k=k, kwargs=kwargs)
 
 
-def upload_to_huggingface_hub(
-    self,
-    huggingface_repo_name: str,
-    use_tmp_dir: bool = True
-    ):
-    """Upload the given colbert model and 
-    """
-    if not self.model:
-        raise ValueError("Model is undefined. Specify the model before attempting to upload the index.")
+    def upload_to_huggingface_hub(self, huggingface_repo_name: str) -> None:
+        """Upload the given colbert model and 
+        """
+        if not self.model:
+            raise ValueError("Model is undefined. Specify the model before attempting to upload the index.")
 
-    colbert_path = self.model.pretrained_model_name_or_path
+        colbert_path = self.model.pretrained_model_name_or_path
 
-    upload_index_and_model(
-        colbert_path=colbert_path,
-        huggingface_repo_name=huggingface_repo_name,
-        index_path=self.index_path,
-        use_tmp_dir=use_tmp_dir
-    )
+        upload_index_and_model(
+            colbert_path=colbert_path,
+            huggingface_repo_name=huggingface_repo_name,
+            index_path=self.index_path,
+        )
