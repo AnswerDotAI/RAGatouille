@@ -205,8 +205,8 @@ def upload_index_and_model(
         save_model(str(Path(export_path) / "model"))
 
         # TODO: before exporting the index, we'd need to update the Index's config (in metadata.json) to make sure checkpoint points to path/to/your/index/model, so it loads properly!
-        colbert_config.checkpoint = str(index_path)
-        colbert_config.save(Path(colbert_path) / "config.json", overwrite=True)
+        # colbert_config.checkpoint = str(index_path)
+        # colbert_config.save(Path(colbert_path) / "config.json", overwrite=True)
 
     if index_path is not None and Path(index_path).exists():
         index_export_path = Path(export_path)

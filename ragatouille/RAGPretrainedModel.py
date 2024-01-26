@@ -2,9 +2,10 @@ from pathlib import Path
 from typing import Any, Callable, List, Optional, TypeVar, Union
 from uuid import uuid4
 
-from huggingface_hub import hf_hub_download
+from huggingface_hub import hf_hub_download, try_to_load_from_cache
 from langchain.retrievers.document_compressors.base import BaseDocumentCompressor
 from langchain_core.retrievers import BaseRetriever
+from transformers.utils import cached_file
 
 from ragatouille.data.corpus_processor import CorpusProcessor
 from ragatouille.data.preprocessors import llama_index_sentence_splitter
@@ -389,14 +390,15 @@ class RAGPretrainedModel:
     ) -> BaseDocumentCompressor:
         return RAGatouilleLangChainCompressor(model=self, k=k, kwargs=kwargs)
 
-
     def upload_to_huggingface_hub(self, huggingface_repo_name: str) -> None:
-        """Upload the given colbert model and 
-        """
+        """Upload the given colbert model and"""
         if not self.model:
-            raise ValueError("Model is undefined. Specify the model before attempting to upload the index.")
+            raise ValueError(
+                "Model is undefined. Specify the model before attempting to upload the index."
+            )
 
-        colbert_path = self.model.pretrained_model_name_or_path
+        colbert_path = Path(try_to_load_from_cache(repo_id=self.model_name, filename="config.json")).parent
+        print(colbert_path)
 
         upload_index_and_model(
             colbert_path=colbert_path,
