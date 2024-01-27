@@ -1,6 +1,7 @@
 import os
 import random
 from collections import defaultdict
+from itertools import product
 from pathlib import Path
 from typing import Literal, Union
 
@@ -82,11 +83,19 @@ class TrainingDataProcessor:
                     triplets.append([q, p, n])
 
             extra_triplets_needed = max_triplets_per_query - initial_triplets_count
-            while extra_triplets_needed > 0:
-                p = self.passage_map[random.choice(all_pos_texts)]
-                n = self.passage_map[random.choice(negatives)]
-                triplets.append([q, p, n])
-                extra_triplets_needed -= 1
+            if extra_triplets_needed > 0:
+                all_combinations = list(product(all_pos_texts, negatives))
+                random.seed(42)
+                random.shuffle(all_combinations)
+                for pos, neg in all_combinations:
+                    p = self.passage_map[pos]
+                    n = self.passage_map[neg]
+                    if [q, p, n] not in triplets:
+                        triplets.append([q, p, n])
+                        extra_triplets_needed -= 1
+                        if extra_triplets_needed <= 0:
+                            break
+
         else:
             p = self.passage_map[positives[0]]
             for n in negatives:
@@ -140,8 +149,8 @@ class TrainingDataProcessor:
                 )
             training_triplets += self._make_individual_triplets(
                 query=query,
-                positives=passages["positives"],
-                negatives=passages["negatives"],
+                positives=list(set(passages["positives"])),
+                negatives=list(set(passages["negatives"])),
             )
         self.training_triplets = training_triplets
 
