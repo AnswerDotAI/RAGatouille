@@ -341,6 +341,7 @@ class RAGPretrainedModel:
         documents: list[str],
         bsize: int = 32,
         document_metadatas: Optional[list[dict]] = None,
+        verbose: bool = True,
     ):
         """Encode documents in memory to be searched through with no Index. Performance degrades rapidly with more documents.
 
@@ -355,6 +356,7 @@ class RAGPretrainedModel:
             documents=documents,
             bsize=bsize,
             document_metadatas=document_metadatas,
+            verbose=verbose,
         )
         print("Documents encoded!")
 

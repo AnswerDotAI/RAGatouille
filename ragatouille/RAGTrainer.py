@@ -106,9 +106,20 @@ class RAGTrainer:
             data_type = "triplets"
         else:
             raise ValueError("Raw data must be a list of pairs or triplets of strings.")
-        self.collection += [x[1] for x in raw_data]
+
+        if type(raw_data[0][1]) == str:
+            self.collection += [x[1] for x in raw_data]
+        else:
+            for x in raw_data:
+                for txt in x[1]:
+                    self.collection.append(txt)
         if data_type == "triplets":
-            self.collection += [x[2] for x in raw_data]
+            if type(raw_data[0][2]) == str:
+                self.collection += [x[2] for x in raw_data]
+            else:
+                for x in raw_data:
+                    for txt in x[2]:
+                        self.collection.append(txt)
 
         self.queries = set([x[0] for x in raw_data])
         self.collection = list(set(self.collection))
