@@ -560,6 +560,7 @@ class ColBERT(LateInteractionModel):
                     math.ceil((percentile_80 * 1.35) / 32) * 32,
                     512,
                 )
+                max_tokens = max(256, max_tokens)
                 if max_tokens > 288:
                     print(
                         f"Your documents are roughly {percentile_80} tokens long at the 80th percentile!",
@@ -621,9 +622,11 @@ class ColBERT(LateInteractionModel):
         ]
         return embedded_queries
 
-    def _encode_index_free_documents(self, documents: list[str], bsize: int = 32):
+    def _encode_index_free_documents(
+        self, documents: list[str], bsize: int = 32, verbose: bool = True
+    ):
         embedded_docs = self.inference_ckpt.docFromText(
-            documents, bsize=bsize, showprogress=True
+            documents, bsize=bsize, showprogress=verbose
         )[0]
         doc_mask = torch.full(embedded_docs.shape[:2], -float("inf"))
         return embedded_docs, doc_mask
@@ -646,9 +649,12 @@ class ColBERT(LateInteractionModel):
         document_metadatas: Optional[list[dict]] = None,
         bsize: int = 32,
         max_tokens: Union[Literal["auto"], int] = "auto",
+        verbose: bool = True,
     ):
         self._set_inference_max_tokens(documents=documents, max_tokens=max_tokens)
-        encodings, doc_masks = self._encode_index_free_documents(documents, bsize=bsize)
+        encodings, doc_masks = self._encode_index_free_documents(
+            documents, bsize=bsize, verbose=verbose
+        )
 
         if hasattr(self, "in_memory_collection"):
             if self.in_memory_metadata is not None:
