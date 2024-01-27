@@ -100,9 +100,7 @@ class TrainingDataProcessor:
         - Randomly sampling from the full collection otherwise
         """
         if mine_hard_negatives:
-            hard_negatives = self.negative_miner.mine_hard_negatives(
-                query, n_new_negatives
-            )
+            hard_negatives = self.negative_miner.mine_hard_negatives(query)
             candidates = [
                 x
                 for x in hard_negatives

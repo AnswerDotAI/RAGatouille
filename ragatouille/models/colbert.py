@@ -553,17 +553,17 @@ class ColBERT(LateInteractionModel):
         ):
             if max_tokens == "auto" or max_tokens > 512:
                 max_tokens = 512
-                percentile_80 = np.percentile(
-                    [len(x.split(" ")) for x in documents], 80
+                percentile_90 = np.percentile(
+                    [len(x.split(" ")) for x in documents], 90
                 )
                 max_tokens = min(
-                    math.ceil((percentile_80 * 1.35) / 32) * 32,
+                    (math.ceil((percentile_90 * 1.35) / 32) * 32) * 1.1,
                     512,
                 )
                 max_tokens = max(256, max_tokens)
                 if max_tokens > 288:
                     print(
-                        f"Your documents are roughly {percentile_80} tokens long at the 80th percentile!",
+                        f"Your documents are roughly {percentile_90} tokens long at the 90th percentile!",
                         "This is quite long and might slow down reranking!\n",
                         "Provide fewer documents, build smaller chunks or run on GPU",
                         "if it takes too long for your needs!",
@@ -655,6 +655,38 @@ class ColBERT(LateInteractionModel):
         encodings, doc_masks = self._encode_index_free_documents(
             documents, bsize=bsize, verbose=verbose
         )
+        encodings = torch.cat(
+            [
+                encodings,
+                torch.zeros(
+                    (
+                        encodings.shape[0],
+                        self.inference_ckpt.doc_tokenizer.doc_maxlen
+                        - encodings.shape[1],
+                        encodings.shape[2],
+                    )
+                ),
+            ],
+            dim=1,
+        )
+        doc_masks = torch.cat(
+            [
+                doc_masks,
+                torch.full(
+                    (
+                        doc_masks.shape[0],
+                        self.inference_ckpt.colbert_config.max_doclen
+                        - doc_masks.shape[1],
+                    ),
+                    -float("inf"),
+                ),
+            ],
+            dim=1,
+        )
+
+        print("Shapes:")
+        print(f"encodings: {encodings.shape}")
+        print(f"doc_masks: {doc_masks.shape}")
 
         if hasattr(self, "in_memory_collection"):
             if self.in_memory_metadata is not None:
@@ -669,34 +701,7 @@ class ColBERT(LateInteractionModel):
             self.in_memory_collection.extend(documents)
 
             # add 0 padding to encodings so they're self.inference_ckpt.doc_tokenizer.doc_maxlen length
-            encodings = torch.cat(
-                [
-                    encodings,
-                    torch.zeros(
-                        (
-                            encodings.shape[0],
-                            self.inference_ckpt.doc_tokenizer.doc_maxlen
-                            - encodings.shape[1],
-                            encodings.shape[2],
-                        )
-                    ),
-                ],
-                dim=1,
-            )
-            doc_masks = torch.cat(
-                [
-                    doc_masks,
-                    torch.full(
-                        (
-                            doc_masks.shape[0],
-                            self.inference_ckpt.doc_tokenizer.doc_maxlen
-                            - doc_masks.shape[1],
-                        ),
-                        -float("inf"),
-                    ),
-                ],
-                dim=1,
-            )
+
             self.in_memory_embed_docs = torch.cat(
                 [self.in_memory_embed_docs, encodings], dim=0
             )
