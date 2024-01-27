@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Callable, List, Optional, TypeVar, Union
+from typing import Any, Callable, List, Literal, Optional, TypeVar, Union
 from uuid import uuid4
 
 from langchain.retrievers.document_compressors.base import BaseDocumentCompressor
@@ -132,7 +132,7 @@ class RAGPretrainedModel:
         document_ids: Union[TypeVar("T"), List[TypeVar("T")]] = None,
         document_metadatas: Optional[list[dict]] = None,
         index_name: str = None,
-        overwrite_index: bool = True,
+        overwrite_index: Union[bool, str] = True,
         max_document_length: int = 256,
         split_documents: bool = True,
         document_splitter_fn: Optional[Callable] = llama_index_sentence_splitter,
@@ -144,7 +144,7 @@ class RAGPretrainedModel:
             collection (list[str]): The collection of documents to index.
             document_ids (Optional[list[str]]): An optional list of document ids. Ids will be generated at index time if not supplied.
             index_name (str): The name of the index that will be built.
-            overwrite_index (bool): Whether to overwrite an existing index with the same name.
+            overwrite_index (Union[bool, str]): Whether to overwrite an existing index with the same name.
             max_document_length (int): The maximum length of a document. Documents longer than this will be split into chunks.
             split_documents (bool): Whether to split documents into chunks.
             document_splitter_fn (Optional[Callable]): A function to split documents into chunks. If None and by default, will use the llama_index_sentence_splitter.
@@ -180,17 +180,13 @@ class RAGPretrainedModel:
             index: item["document_id"] for index, item in enumerate(collection_with_ids)
         }
         collection = [x["content"] for x in collection_with_ids]
-
-        overwrite = "reuse"
-        if overwrite_index:
-            overwrite = True
         return self.model.index(
             collection,
             pid_docid_map=pid_docid_map,
             docid_metadata_map=docid_metadata_map,
             index_name=index_name,
             max_document_length=max_document_length,
-            overwrite=overwrite,
+            overwrite=overwrite_index,
         )
 
     def add_to_index(
@@ -342,6 +338,7 @@ class RAGPretrainedModel:
         bsize: int = 32,
         document_metadatas: Optional[list[dict]] = None,
         verbose: bool = True,
+        max_document_length: Union[Literal["auto"], int] = "auto",
     ):
         """Encode documents in memory to be searched through with no Index. Performance degrades rapidly with more documents.
 
@@ -357,6 +354,7 @@ class RAGPretrainedModel:
             bsize=bsize,
             document_metadatas=document_metadatas,
             verbose=verbose,
+            max_tokens=max_document_length,
         )
         if verbose:
             print("Documents encoded!")
