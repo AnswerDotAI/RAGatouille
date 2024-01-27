@@ -123,7 +123,6 @@ class SimpleMiner(HardNegativeMiner):
                 force_fp32=force_fp32,
             )
         if isinstance(queries, str):
-            print("mining")
             return self._mine(queries)
         return self._batch_mine(queries)
 

@@ -560,6 +560,7 @@ class ColBERT(LateInteractionModel):
                     math.ceil((percentile_80 * 1.35) / 32) * 32,
                     512,
                 )
+                max_tokens = max(256, max_tokens)
                 if max_tokens > 288:
                     print(
                         f"Your documents are roughly {percentile_80} tokens long at the 80th percentile!",
