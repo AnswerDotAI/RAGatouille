@@ -12,7 +12,7 @@ colbert = ColBERT(
 
 documents = ['a', 'bob the builder', 'flexor ai is a great startup that will kiilll it', 'd', 'e', 'f']
 
-queries = ['b is bob']
+query = 'did the customer request a discount?'
 
-files = colbert.create_heatmaps_query_documents(query=queries[0],documents=documents,k = 2)
+files = colbert.create_heatmaps_query_documents(query=query,documents=documents)
 print(files)
