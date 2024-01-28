@@ -255,4 +255,6 @@ class TrainingDataProcessor:
                 document = document.replace("\t", " ").replace("\n", " ")
                 f.write(f"{idx}\t{document}\n")
 
+        random.seed(42)
+        random.shuffle(self.training_triplets)
         srsly.write_jsonl(path / "triples.train.colbert.jsonl", self.training_triplets)
