@@ -8,6 +8,11 @@ from typing import Dict, List, Literal, Optional, TypeVar, Union
 import numpy as np
 import srsly
 import torch
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+
 from colbert import Indexer, IndexUpdater, Searcher, Trainer
 from colbert.infra import ColBERTConfig, Run, RunConfig
 from colbert.modeling.checkpoint import Checkpoint
@@ -750,3 +755,85 @@ class ColBERT(LateInteractionModel):
     def __del__(self):
         # Clean up context
         self.run_context.__exit__(None, None, None)
+    
+    def generate_heatmaps(self, Q, D, tokenized_query, tokenized_documents, D_mask=None):
+        file_names = []
+
+        if ColBERTConfig().total_visible_gpus > 0:
+            Q, D = Q.cuda(), D.cuda()
+            if D_mask is not None:
+                D_mask = D_mask.cuda()
+
+        for i, (doc, text) in enumerate(zip(D, tokenized_documents)):
+            plt.figure(figsize=(len(tokenized_query[0]), len(tokenized_documents[i])))
+            # Compute dot product
+            scores = (doc @ Q.to(dtype=doc.dtype).permute(0, 2, 1)).squeeze()
+            
+            scores_clone = scores.clone()
+            document_score_length_normalized = scores_clone.max(1).values.sum(-1).cpu().numpy()/len(tokenized_documents[i])
+
+              # Identify non-zero rows
+            non_zero_rows = np.any(scores.cpu().numpy() != 0, axis=1)
+
+            # Filter out zero rows from the scores matrix
+            filtered_scores = scores.cpu().numpy()[non_zero_rows, :]
+
+            # Generate heatmap
+            ax = sns.heatmap(filtered_scores, cmap="YlGnBu", xticklabels=tokenized_query[0], yticklabels=text, vmin=0,vmax=1)
+            ax.set_title(f"Heatmap for Document {i+1}\nNormalized Document score is {document_score_length_normalized}")
+            plt.xticks(rotation=90)  # Rotate x-axis labels for better readability
+            plt.yticks(rotation=0)   # Rotate y-axis labels if necessary
+
+            # Save heatmap to file
+            file_name = f"heatmap_document_{i+1}.png"
+            plt.savefig(file_name, bbox_inches='tight')  # bbox_inches='tight' for a fitted layout
+            file_names.append(file_name)
+
+            plt.close()
+
+        return file_names
+    
+    #This is a fix because colbert's function is broken
+    def doc_tokenizer(self,batch_text, add_special_tokens=False):
+        assert type(batch_text) in [list, tuple], (type(batch_text))
+
+        tokens = [self.inference_ckpt.doc_tokenizer.tok.tokenize(x, add_special_tokens=False) for x in batch_text]
+
+        if not add_special_tokens:
+            return tokens
+
+        prefix, suffix = [self.inference_ckpt.doc_tokenizer.cls_token, self.inference_ckpt.doc_tokenizer.D_marker_token], [self.inference_ckpt.doc_tokenizer.sep_token]
+        tokens = [prefix + lst + suffix for lst in tokens]
+
+        return tokens
+    
+    def create_heatmaps_query_documents(
+        self,
+        query: Union[str, list[str]],
+        documents: list[str],
+        max_tokens: Union[Literal["auto"], int] = "auto",
+        bsize: int = 32,
+    ):
+        self._set_inference_max_tokens(documents=documents, max_tokens=max_tokens)
+
+        if len(documents) > 1000:
+            print(
+                "Please note ranking in-memory is not optimised for large document counts! ",
+                "Consider building an index and using search instead!",
+            )
+        if len(set(documents)) != len(documents):
+            print(
+                "WARNING! Your documents have duplicate entries! ",
+                "This will slow down calculation and may yield subpar results",
+            )
+        tokenized_query = self.inference_ckpt.query_tokenizer.tokenize([query],add_special_tokens=True)
+        tokenized_docs = self.doc_tokenizer(batch_text=documents,add_special_tokens=True)
+        embedded_queries = self._encode_index_free_queries(query, bsize=bsize)
+        embedded_docs, doc_mask = self._encode_index_free_documents(
+            documents, bsize=bsize
+        )
+
+        return self.generate_heatmaps(tokenized_query=tokenized_query,tokenized_documents=tokenized_docs,Q= embedded_queries[0],D= embedded_docs,D_mask= doc_mask)
+
+
+
