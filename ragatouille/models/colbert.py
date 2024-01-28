@@ -772,11 +772,17 @@ class ColBERT(LateInteractionModel):
             scores_clone = scores.clone()
             document_score_length_normalized = scores_clone.max(1).values.sum(-1).cpu().numpy()/len(tokenized_documents[i])
 
-              # Identify non-zero rows
-            non_zero_rows = np.any(scores.cpu().numpy() != 0, axis=1)
+            # Convert to numpy
+            scores_np = scores.cpu().numpy()
 
-            # Filter out zero rows from the scores matrix
-            filtered_scores = scores.cpu().numpy()[non_zero_rows, :]
+            # Identify trailing zero rows from the end
+            # This will be the index of the first non zero row found when iterating from the end towards the beginning
+            last_valid_row_index = len(scores_np) - next((i for i, row in enumerate(scores_np[::-1]) if np.any(row != 0)), len(scores_np))
+
+            # Remove the zero rows from the end by slicing the numpy array up to the last valid row index
+            filtered_scores = scores_np[:last_valid_row_index]
+
+            # print(f"Scores shape: {filtered_scores.shape}\n tokenized_query len: {len(tokenized_query[0])}\n tokenized doc len: {len(text)}")
 
             # Generate heatmap
             ax = sns.heatmap(filtered_scores, cmap="YlGnBu", xticklabels=tokenized_query[0], yticklabels=text, vmin=0,vmax=1)
@@ -785,7 +791,7 @@ class ColBERT(LateInteractionModel):
             plt.yticks(rotation=0)   # Rotate y-axis labels if necessary
 
             # Save heatmap to file
-            file_name = f"heatmap_document_{i+1}.png"
+            file_name = f"./results/heatmap_doc_{i+1}_score_{document_score_length_normalized}.png"
             plt.savefig(file_name, bbox_inches='tight')  # bbox_inches='tight' for a fitted layout
             file_names.append(file_name)
 
@@ -814,7 +820,10 @@ class ColBERT(LateInteractionModel):
         max_tokens: Union[Literal["auto"], int] = "auto",
         bsize: int = 32,
     ):
-        self._set_inference_max_tokens(documents=documents, max_tokens=max_tokens)
+        # self._set_inference_max_tokens(documents=documents, max_tokens=max_tokens)
+        self.inference_ckpt_len_set = True
+        self.inference_ckpt.query_tokenizer.background_maxlen = max_tokens
+        self.inference_ckpt.doc_tokenizer.doc_maxlen =max_tokens
 
         if len(documents) > 1000:
             print(
@@ -827,6 +836,7 @@ class ColBERT(LateInteractionModel):
                 "This will slow down calculation and may yield subpar results",
             )
         tokenized_query = self.inference_ckpt.query_tokenizer.tokenize([query],add_special_tokens=True)
+        
         tokenized_docs = self.doc_tokenizer(batch_text=documents,add_special_tokens=True)
         embedded_queries = self._encode_index_free_queries(query, bsize=bsize)
         embedded_docs, doc_mask = self._encode_index_free_documents(
