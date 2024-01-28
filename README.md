@@ -3,6 +3,7 @@
 _Easily use and train state of the art retrieval methods in any RAG pipeline. Designed for modularity and ease-of-use, backed by research._
 
 [![GitHub stars](https://img.shields.io/github/stars/bclavie/ragatouille.svg)](https://github.com/bclavie/ragatouille/stargazers)
+[![Downloads](https://static.pepy.tech/badge/ragatouille/month)](https://pepy.tech/project/ragatouille)
 [![Documentation](https://img.shields.io/badge/docs-available-brightgreen)](https://ben.clavie.eu/ragatouille/)
 [![Twitter Follow](https://img.shields.io/twitter/follow/bclavie?style=social)](https://twitter.com/bclavie)
 
