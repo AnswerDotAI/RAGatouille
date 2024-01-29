@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "RAGatouille"
-version = "0.0.6b1"
+version = "0.0.6b2"
 description = "Library to facilitate the use of state-of-the-art retrieval models in common RAG contexts."
 authors = ["Benjamin Clavie <ben@clavie.eu>"]
 readme = "README.md"
@@ -13,6 +13,7 @@ ruff = "^0.1.9"
 faiss-cpu = "^1.7.4"
 transformers = "^4.36.2"
 voyager = "^2.0.2"
+aiohttp = "3.9.1"
 sentence-transformers = "^2.2.2"
 torch = "^2.0.1"
 llama-index = "^0.9.24"
