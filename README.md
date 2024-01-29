@@ -146,7 +146,7 @@ Once this is done running, your index will be saved on-disk and ready to be quer
 - Embedding the documents and generating the bags-of-embeddings
 - Compressing the vectors and storing them on disk
 
-Curious about how this works? Check out the [Late-Interaction & ColBERT concept explainer](https://ben.clavie.eu/ragatouille/concepts)
+Curious about how this works? Check out the [Late-Interaction & ColBERT concept explainer](https://ben.clavie.eu/ragatouille/#late-interaction)
 <!-- or find out more about [indexing](https://ben.clavie.eu/ragatouille/indexing)! -->
 
 ### 🔎 Retrieving Documents
