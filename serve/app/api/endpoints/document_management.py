@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from app.models.payloads import AddToIndexQuery, DeleteFromIndexQuery, SearchQuery
-from app.core.rag_model import get_rag_model
+from app.core.rag_model import get_rag_model, delete_rag_model
 import logging
 
 router = APIRouter()
@@ -28,6 +28,7 @@ async def delete_from_index(query: DeleteFromIndexQuery, rag=Depends(get_rag_mod
             document_ids=query.document_ids,
             index_name=query.index_name
         )
+        # delete_rag_model()
         return {"message": "Documents deleted from index successfully"}
     except Exception as e:
         logger.error(f"Failed to delete documents from index: {e}")

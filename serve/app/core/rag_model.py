@@ -20,6 +20,18 @@ class RAGModel:
         else:
             logger.debug("RAGPretrainedModel instance already exists, reusing the existing instance.")
         return cls.model_instance
+    
+    @classmethod
+    def delete_instance(cls):
+        if cls.model_instance is not None:
+            logger.info("Deleting RAGPretrainedModel instance...")
+            cls.model_instance = None
+            logger.info("RAGPretrainedModel instance deleted successfully.")
+        else:
+            logger.debug("RAGPretrainedModel instance does not exist, nothing to delete.")
 
 def get_rag_model() -> RAGPretrainedModel:
     return RAGModel.get_instance()
+
+def delete_rag_model():
+    RAGModel.delete_instance()
