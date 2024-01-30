@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+pydantic
+pytest
+requests
+starlette
+python-multipart
+pydantic-settings
