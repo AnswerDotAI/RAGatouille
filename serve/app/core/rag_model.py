@@ -15,7 +15,7 @@ class RAGModel:
         if cls.model_instance is None:
             logger.info("Initializing RAGPretrainedModel instance...")
             # Initialize and configure RAGPretrainedModel
-            cls.model_instance = RAGPretrainedModel.from_pretrained(settings.MODEL_NAME)
+            cls.model_instance = RAGPretrainedModel.from_pretrained(pretrained_model_name_or_path=settings.MODEL_NAME, index_root=settings.INDEX_ROOT)
             logger.info("RAGPretrainedModel instance created successfully.")
         else:
             logger.debug("RAGPretrainedModel instance already exists, reusing the existing instance.")

@@ -14,7 +14,7 @@ def test_search():
 
 def test_add_to_index():
     response = client.post("/api/v1/documents/add", json=add_documents)
-    assert response.status_code == 200
+    assert response.status_code == 201
     assert response.json() == {"message": "Documents added to index successfully"}
 
 def test_delete_from_index():

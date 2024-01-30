@@ -60,11 +60,15 @@ http://127.0.0.1:8000/docs
 
 ## API Endpoints
 
-- **POST /api/v1/search/:** Search documents.
-- **POST /api/v1/index/:** Create or update an index with documents.
-- **POST /api/v1/add_to_index/:** Add documents to an existing index.
-- **DELETE /api/v1/delete_from_index/:** Delete documents from an index.
-- **POST /api/v1/rerank/:** Rerank a set of documents based on a query.
+### Index
+- **POST /api/v1/index/:** Create an index with documents.
+### Document Management
+- **POST /api/v1/documents/search/:** Search documents.
+- _**[ISSUE] POST /api/v1/documents/add/:** Add documents to an existing index._
+- _**[ISSUE] DELETE /api/v1/documents/delete/:** Delete documents from an index._
+### Encode
 - **POST /api/v1/encode/:** Encode documents.
-- **POST /api/v1/search_encoded_docs/:** Search through encoded documents.
-- **POST /api/v1/clear_encoded_docs/:** Clear all encoded documents.
+- **POST /api/v1/encode/search/:** Search through encoded documents.
+- **POST /api/v1/encode/clear/:** Clear all encoded documents.
+### Rerank
+- **POST /api/v1/rerank/:** Rerank a set of documents based on a query.
