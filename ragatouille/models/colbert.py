@@ -448,7 +448,9 @@ class ColBERT(LateInteractionModel):
 
         pids = None
         if doc_ids is not None:
-            pids = [self.docid_pid_map[doc_id] for doc_id in doc_ids]
+            pids = []
+            for doc_id in doc_ids:
+                pids.extend(self.docid_pid_map[doc_id])
 
         if isinstance(query, str):
             results = [self._search(query, k, pids)]
