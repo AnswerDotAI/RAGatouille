@@ -35,7 +35,7 @@ Want to give it a try? Nothing easier, just run `pip install ragatouille` and yo
 
 RAGatouille makes it as simple as can be to use ColBERT! We want the library to work on two levels:
 
-- Strong, but parameterable defaults: you should be able to get started with just a few lines of code and still leverage the full power of ColBERT, and you should be able to tweak any relevant parameter if you need to!
+- Strong, but parameterizable defaults: you should be able to get started with just a few lines of code and still leverage the full power of ColBERT, and you should be able to tweak any relevant parameter if you need to!
 - Powerful yet simple re-usable components under-the-hood: any part of the library should be usable stand-alone. You can use our DataProcessor or our negative miners outside of `RAGPretrainedModel` and `RagTrainer`, and you can even write your own negative miner and use it in the pipeline if you want to!
 <!-- (more on [components](https://ben.clavie.eu/ragatouille/components)). -->
 
@@ -75,7 +75,7 @@ trainer.prepare_training_data(raw_data=my_data)
 
 ColBERT prefers to store processed training data on-file, which also makes easier to properly version training data via `wandb` or `dvc`. By default, it will write to `./data/`, but you can override this by passing a `data_out_path` argument to `prepare_training_data()`.
 
-Just like all things in RAGatouille, `prepare_training_data` uses strong defaults, but is also fully parameterable.
+Just like all things in RAGatouille, `prepare_training_data` uses strong defaults, but is also fully parameterizable.
 <!-- Check out the [Data Processing](https://ben.clavie.eu/ragatouille/data-processing) section of the docs! -->
 
 #### Running the Training/Fine-Tuning
