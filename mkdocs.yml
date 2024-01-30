@@ -7,6 +7,7 @@ site_url: https://ragatouille.clavie.eu
 edit_uri: edit/main/docs/
 copyright: Copyright &copy; 2024 Benjamin Clavié
 plugins:
+  - search
   - mkdocstrings:
       handlers:
         python:
