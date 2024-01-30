@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "RAGatouille"
-version = "0.0.6b0"
+version = "0.0.6b3"
 description = "Library to facilitate the use of state-of-the-art retrieval models in common RAG contexts."
 authors = ["Benjamin Clavie <ben@clavie.eu>"]
 readme = "README.md"
@@ -21,6 +21,7 @@ langchain_core = "^0.1.4"
 colbert-ai = "0.2.18"
 langchain = "^0.1.0"
 onnx = "^1.15.0"
+srsly = "2.4.8"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"
