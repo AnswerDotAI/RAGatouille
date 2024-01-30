@@ -439,14 +439,19 @@ class ColBERT(LateInteractionModel):
         k: int = 10,
         force_fast: bool = False,
         zero_index_ranks: bool = False,
+        doc_ids: Optional[List[str]] = None
     ):
         if self.searcher is None or (
             index_name is not None and self.index_name != index_name
         ):
             self._load_searcher(index_name=index_name, force_fast=force_fast)
 
+        pids = None
+        if doc_ids is not None:
+            pids = [self.docid_pid_map[doc_id] for doc_id in doc_ids]
+
         if isinstance(query, str):
-            results = [self._search(query, k)]
+            results = [self._search(query, k, pids)]
         else:
             results = self._batch_search(query, k)
 
@@ -476,8 +481,8 @@ class ColBERT(LateInteractionModel):
             return to_return[0]
         return to_return
 
-    def _search(self, query: str, k: int):
-        return self.searcher.search(query, k=k)
+    def _search(self, query: str, k: int, pids: Optional[List[int]] = None):
+        return self.searcher.search(query, k=k, pids=pids)
 
     def _batch_search(self, query: list[str], k: int):
         queries = {i: x for i, x in enumerate(query)}

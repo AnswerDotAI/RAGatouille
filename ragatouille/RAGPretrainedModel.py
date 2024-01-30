@@ -265,6 +265,7 @@ class RAGPretrainedModel:
         k: int = 10,
         force_fast: bool = False,
         zero_index_ranks: bool = False,
+        doc_ids: Optional[list[str]] = None,
         **kwargs,
     ):
         """Query an index.
@@ -295,6 +296,7 @@ class RAGPretrainedModel:
             k=k,
             force_fast=force_fast,
             zero_index_ranks=zero_index_ranks,
+            doc_ids=doc_ids,
             **kwargs,
         )
 
