@@ -11,7 +11,6 @@ import torch
 from colbert import Indexer, IndexUpdater, Searcher, Trainer
 from colbert.infra import ColBERTConfig, Run, RunConfig
 from colbert.modeling.checkpoint import Checkpoint
-
 from ragatouille.models.base import LateInteractionModel
 
 
@@ -756,4 +755,7 @@ class ColBERT(LateInteractionModel):
 
     def __del__(self):
         # Clean up context
-        self.run_context.__exit__(None, None, None)
+        try:
+            self.run_context.__exit__(None, None, None)
+        except Exception:
+            print("INFO: Tried to clean up context but failed!")
