@@ -18,7 +18,12 @@ class RAGatouilleLangChainRetriever(BaseRetriever):
     ) -> List[Document]:
         """Get documents relevant to a query."""
         docs = self.model.search(query, **self.kwargs)
-        return [Document(page_content=doc["content"]) for doc in docs]
+        return [
+            Document(
+                page_content=doc["content"], metadata=doc.get("document_metadata", {})
+            )
+            for doc in docs
+        ]
 
 
 class RAGatouilleLangChainCompressor(BaseDocumentCompressor):
