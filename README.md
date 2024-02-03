@@ -3,6 +3,7 @@
 _Easily use and train state of the art retrieval methods in any RAG pipeline. Designed for modularity and ease-of-use, backed by research._
 
 [![GitHub stars](https://img.shields.io/github/stars/bclavie/ragatouille.svg)](https://github.com/bclavie/ragatouille/stargazers)
+[![Python Versions](https://img.shields.io/badge/Python-3.9_3.10_3.11-blue)]
 [![Downloads](https://static.pepy.tech/badge/ragatouille/month)](https://pepy.tech/project/ragatouille)
 [![Documentation](https://img.shields.io/badge/docs-available-brightgreen)](https://ben.clavie.eu/ragatouille/)
 [![Twitter Follow](https://img.shields.io/twitter/follow/bclavie?style=social)](https://twitter.com/bclavie)
@@ -26,10 +27,10 @@ _If you want to read more about the motivations, philosophy, and why the late-in
 
 Want to give it a try? Nothing easier, just run `pip install ragatouille` and you're good to go!
 
-⚠️ RAGatouille currently has two running requirements: ⚠️
+⚠️ Running notes/requirements: ⚠️
 
 - If running inside a script, you must run it inside `if __name__ == "__main__"`
-- It does not currently support Google Colab **
+- Windows is not supported. RAGatouille doesn't appear to work outside WSL and has issues with WSL1. Some users have had success running RAGatouille in WSL2.
 
 ## Get Started
 
