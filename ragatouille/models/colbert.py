@@ -690,9 +690,10 @@ class ColBERT(LateInteractionModel):
             dim=1,
         )
 
-        print("Shapes:")
-        print(f"encodings: {encodings.shape}")
-        print(f"doc_masks: {doc_masks.shape}")
+        if verbose:
+            print("Shapes:")
+            print(f"encodings: {encodings.shape}")
+            print(f"doc_masks: {doc_masks.shape}")
 
         if hasattr(self, "in_memory_collection"):
             if self.in_memory_metadata is not None:
