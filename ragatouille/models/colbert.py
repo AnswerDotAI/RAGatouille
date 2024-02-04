@@ -563,7 +563,7 @@ class ColBERT(LateInteractionModel):
                     [len(x.split(" ")) for x in documents], 90
                 )
                 max_tokens = min(
-                    (math.ceil((percentile_90 * 1.35) / 32) * 32) * 1.1,
+                    math.floor((math.ceil((percentile_90 * 1.35) / 32) * 32) * 1.1),
                     512,
                 )
                 max_tokens = max(256, max_tokens)
