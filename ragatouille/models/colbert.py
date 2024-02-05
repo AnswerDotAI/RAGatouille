@@ -438,7 +438,7 @@ class ColBERT(LateInteractionModel):
         k: int = 10,
         force_fast: bool = False,
         zero_index_ranks: bool = False,
-        doc_ids: Optional[List[str]] = None
+        doc_ids: Optional[List[str]] = None,
     ):
         if self.searcher is None or (
             index_name is not None and self.index_name != index_name
