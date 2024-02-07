@@ -33,11 +33,12 @@ class TrainingDataProcessor:
         negative_label: int = 0,
         hard_negative_minimum_rank: int = 10,
     ):
-        self.negative_miner.min_rank = hard_negative_minimum_rank
         if self.negative_miner is None and mine_hard_negatives:
             raise ValueError(
                 "mine_hard_negatives is True but no negative miner was provided!"
             )
+        if self.negative_miner:
+            self.negative_miner.min_rank = hard_negative_minimum_rank
         if data_type == "pairs":
             self._process_raw_pairs(
                 raw_data=raw_data,
