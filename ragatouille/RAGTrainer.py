@@ -2,7 +2,6 @@ from pathlib import Path
 from typing import Literal, Optional, Union
 
 from colbert.infra import ColBERTConfig
-
 from ragatouille.data import TrainingDataProcessor
 from ragatouille.models import ColBERT, LateInteractionModel
 from ragatouille.negative_miners import HardNegativeMiner, SimpleMiner
@@ -107,19 +106,22 @@ class RAGTrainer:
         else:
             raise ValueError("Raw data must be a list of pairs or triplets of strings.")
 
+        self.queries = set()
         for x in raw_data:
-          if isinstance(x[1], str):
-              self.collection.append(x[1])
-          elif isinstance(x[1], list):
-              self.collection += [txt for txt in x[1] if isinstance(txt, str)]
+            if isinstance(x[0], str):
+                self.queries.add(x[0])
+            else:
+                raise ValueError("Queries must be a strings.")
+            if isinstance(x[1], str):
+                self.collection.append(x[1])
+            elif isinstance(x[1], list):
+                self.collection += [txt for txt in x[1] if isinstance(txt, str)]
 
-          if len(x) == 3:  # For triplets
-              if isinstance(x[2], str):
-                  self.collection.append(x[2])
-              elif isinstance(x[2], list):
-                  self.collection += [txt for txt in x[2] if isinstance(txt, str)]
-
-        self.queries = set([x[0] for x in raw_data if isinstance(x[0], str)])
+            if len(x) == 3:  # For triplets
+                if isinstance(x[2], str):
+                    self.collection.append(x[2])
+                elif isinstance(x[2], list):
+                    self.collection += [txt for txt in x[2] if isinstance(txt, str)]
         self.collection = list(set(self.collection))
         seeded_shuffle(self.collection)
 
