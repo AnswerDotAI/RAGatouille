@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Literal, Optional, Union
 
 from colbert.infra import ColBERTConfig
+
 from ragatouille.data import TrainingDataProcessor
 from ragatouille.models import ColBERT, LateInteractionModel
 from ragatouille.negative_miners import HardNegativeMiner, SimpleMiner
