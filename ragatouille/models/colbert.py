@@ -11,6 +11,7 @@ import torch
 from colbert import Indexer, IndexUpdater, Searcher, Trainer
 from colbert.infra import ColBERTConfig, Run, RunConfig
 from colbert.modeling.checkpoint import Checkpoint
+
 from ragatouille.models.base import LateInteractionModel
 
 

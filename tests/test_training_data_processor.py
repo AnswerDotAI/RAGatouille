@@ -7,19 +7,21 @@ from ragatouille.data import TrainingDataProcessor
 
 @pytest.fixture
 def collection():
-    return ['doc1', 'doc2', 'doc3']
+    return ["doc1", "doc2", "doc3"]
 
 
 @pytest.fixture
 def queries():
-    return ['query1', 'query2']
+    return ["query1", "query2"]
 
 
 def test_process_raw_data_without_miner(collection, queries):
     processor = TrainingDataProcessor(collection, queries, None)
     processor._process_raw_pairs = MagicMock(return_value=None)
 
-    processor.process_raw_data(raw_data=[], data_type="pairs", data_dir="./", mine_hard_negatives=False)
+    processor.process_raw_data(
+        raw_data=[], data_type="pairs", data_dir="./", mine_hard_negatives=False
+    )
 
     processor._process_raw_pairs.assert_called_once()
 
