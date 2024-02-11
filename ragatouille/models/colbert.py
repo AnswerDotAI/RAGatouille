@@ -468,6 +468,7 @@ class ColBERT(LateInteractionModel):
                     "score": score,
                     "rank": rank - 1 if zero_index_ranks else rank,
                     "document_id": document_id,
+                    "passage_id": id_
                 }
 
                 if self.docid_metadata_map is not None:
