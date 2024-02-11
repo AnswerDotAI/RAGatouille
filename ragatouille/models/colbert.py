@@ -11,7 +11,6 @@ import torch
 from colbert import Indexer, IndexUpdater, Searcher, Trainer
 from colbert.infra import ColBERTConfig, Run, RunConfig
 from colbert.modeling.checkpoint import Checkpoint
-
 from ragatouille.models.base import LateInteractionModel
 
 
@@ -459,6 +458,10 @@ class ColBERT(LateInteractionModel):
             for doc_id in doc_ids:
                 pids.extend(self.docid_pid_map[doc_id])
 
+        if k > (32 * self.searcher.config.ncells):
+            base_ncells = self.searcher.config.ncells
+            self.searcher.configure(ncells=k // 32 + 1)
+
         if isinstance(query, str):
             results = [self._search(query, k, pids)]
         else:
@@ -486,6 +489,9 @@ class ColBERT(LateInteractionModel):
                 result_for_query.append(result_dict)
 
             to_return.append(result_for_query)
+
+        # Restore original ncells if it had to be changed for large k values
+        self.searcher.configure(ncells=base_ncells)
 
         if len(to_return) == 1:
             return to_return[0]
