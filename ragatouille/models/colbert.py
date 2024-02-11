@@ -338,6 +338,13 @@ class ColBERT(LateInteractionModel):
             self.config, ColBERTConfig(nbits=nbits)
         )
 
+        if len(self.collection) > 100000:
+            self.config.kmeans_niters = 4
+        elif len(self.collection) > 50000:
+            self.config.kmeans_niters = 10
+        else:
+            self.config.kmeans_niters = 20
+
         # Instruct colbert-ai to disable forking if nranks == 1
         self.config.avoid_fork_if_possible = True
         self.indexer = Indexer(
@@ -468,7 +475,7 @@ class ColBERT(LateInteractionModel):
                     "score": score,
                     "rank": rank - 1 if zero_index_ranks else rank,
                     "document_id": document_id,
-                    "passage_id": id_
+                    "passage_id": id_,
                 }
 
                 if self.docid_metadata_map is not None:
