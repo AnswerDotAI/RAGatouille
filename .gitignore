@@ -115,6 +115,9 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
+# data files
+*.tsv
+*.jsonl
 
 .mypy.ipynb_checkpoints
 .mkdocs.yml
