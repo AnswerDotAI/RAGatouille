@@ -11,7 +11,6 @@ import torch
 from colbert import Indexer, IndexUpdater, Searcher, Trainer
 from colbert.infra import ColBERTConfig, Run, RunConfig
 from colbert.modeling.checkpoint import Checkpoint
-
 from ragatouille.models.base import LateInteractionModel
 
 
@@ -423,11 +422,12 @@ class ColBERT(LateInteractionModel):
 
         if not force_fast:
             self.searcher.configure(ndocs=1024)
+            self.searcher.configure(ncells=16)
             if len(self.searcher.collection) < 10000:
-                self.searcher.configure(ncells=4)
+                self.searcher.configure(ncells=8)
                 self.searcher.configure(centroid_score_threshold=0.4)
             elif len(self.searcher.collection) < 100000:
-                self.searcher.configure(ncells=2)
+                self.searcher.configure(ncells=4)
                 self.searcher.configure(centroid_score_threshold=0.45)
             # Otherwise, use defaults for k
         else:
@@ -467,9 +467,12 @@ class ColBERT(LateInteractionModel):
                 f"Lowering k to {len(self.searcher.collection)}...",
             )
             k = len(self.searcher.collection)
+
+        # For smaller collections, we need a higher ncells value to ensure we return enough results
         if k > (32 * self.searcher.config.ncells):
-            self.searcher.configure(ncells=k // 32 + 2)
-        self.searcher.configure(ndocs=max(k * 4, 4096))
+            self.searcher.configure(ncells=min((k // 32 + 2), base_ncells))
+
+        self.searcher.configure(ndocs=max(k * 4, base_ndocs))
 
         if isinstance(query, str):
             results = [self._search(query, k, pids)]
