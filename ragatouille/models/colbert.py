@@ -338,6 +338,13 @@ class ColBERT(LateInteractionModel):
             self.config, ColBERTConfig(nbits=nbits)
         )
 
+        if len(self.collection) > 100000:
+            self.config.kmeans_niters = 4
+        elif len(self.collection) > 50000:
+            self.config.kmeans_niters = 10
+        else:
+            self.config.kmeans_niters = 20
+
         # Instruct colbert-ai to disable forking if nranks == 1
         self.config.avoid_fork_if_possible = True
         self.indexer = Indexer(
@@ -439,14 +446,21 @@ class ColBERT(LateInteractionModel):
         k: int = 10,
         force_fast: bool = False,
         zero_index_ranks: bool = False,
+        doc_ids: Optional[List[str]] = None,
     ):
         if self.searcher is None or (
             index_name is not None and self.index_name != index_name
         ):
             self._load_searcher(index_name=index_name, force_fast=force_fast)
 
+        pids = None
+        if doc_ids is not None:
+            pids = []
+            for doc_id in doc_ids:
+                pids.extend(self.docid_pid_map[doc_id])
+
         if isinstance(query, str):
-            results = [self._search(query, k)]
+            results = [self._search(query, k, pids)]
         else:
             results = self._batch_search(query, k)
 
@@ -461,6 +475,7 @@ class ColBERT(LateInteractionModel):
                     "score": score,
                     "rank": rank - 1 if zero_index_ranks else rank,
                     "document_id": document_id,
+                    "passage_id": id_,
                 }
 
                 if self.docid_metadata_map is not None:
@@ -476,8 +491,8 @@ class ColBERT(LateInteractionModel):
             return to_return[0]
         return to_return
 
-    def _search(self, query: str, k: int):
-        return self.searcher.search(query, k=k)
+    def _search(self, query: str, k: int, pids: Optional[List[int]] = None):
+        return self.searcher.search(query, k=k, pids=pids)
 
     def _batch_search(self, query: list[str], k: int):
         queries = {i: x for i, x in enumerate(query)}
@@ -544,6 +559,34 @@ class ColBERT(LateInteractionModel):
 
         return results
 
+    def _set_inference_max_tokens(
+        self, documents: list[str], max_tokens: Union[Literal["auto"], int] = "auto"
+    ):
+        if (
+            not hasattr(self, "inference_ckpt_len_set")
+            or self.inference_ckpt_len_set is False
+        ):
+            if max_tokens == "auto" or max_tokens > 512:
+                max_tokens = 512
+                percentile_90 = np.percentile(
+                    [len(x.split(" ")) for x in documents], 90
+                )
+                max_tokens = min(
+                    math.floor((math.ceil((percentile_90 * 1.35) / 32) * 32) * 1.1),
+                    512,
+                )
+                max_tokens = max(256, max_tokens)
+                if max_tokens > 288:
+                    print(
+                        f"Your documents are roughly {percentile_90} tokens long at the 90th percentile!",
+                        "This is quite long and might slow down reranking!\n",
+                        "Provide fewer documents, build smaller chunks or run on GPU",
+                        "if it takes too long for your needs!",
+                    )
+            self.inference_ckpt.colbert_config.max_doclen = max_tokens
+            self.inference_ckpt.doc_tokenizer.doc_maxlen = max_tokens
+            self.inference_ckpt_len_set = True
+
     def _index_free_retrieve(
         self,
         query: Union[str, list[str]],
@@ -553,23 +596,7 @@ class ColBERT(LateInteractionModel):
         zero_index: bool = False,
         bsize: int = 32,
     ):
-        if max_tokens == "auto" or max_tokens > 512:
-            max_tokens = 512
-            percentile_80 = np.percentile([len(x.split(" ")) for x in documents], 80)
-            max_tokens = min(
-                math.ceil((percentile_80 * 1.35) / 32) * 32,
-                512,
-            )
-            if max_tokens > 288:
-                print(
-                    f"Your documents are roughly {percentile_80} tokens long at the 80th percentile!",
-                    "This is quite long and might slow down reranking!\n",
-                    "Provide fewer documents, build smaller chunks or run on GPU",
-                    "if it takes too long for your needs!",
-                )
-
-        self.inference_ckpt.colbert_config.max_doclen = max_tokens
-        self.inference_ckpt.doc_tokenizer.doc_maxlen = max_tokens
+        self._set_inference_max_tokens(documents=documents, max_tokens=max_tokens)
 
         if k > len(documents):
             print("k value cannot be larger than the number of documents! aborting...")
@@ -610,8 +637,12 @@ class ColBERT(LateInteractionModel):
         ]
         return embedded_queries
 
-    def _encode_index_free_documents(self, documents: list[str], bsize: int = 32):
-        embedded_docs = self.inference_ckpt.docFromText(documents, bsize=bsize)[0]
+    def _encode_index_free_documents(
+        self, documents: list[str], bsize: int = 32, verbose: bool = True
+    ):
+        embedded_docs = self.inference_ckpt.docFromText(
+            documents, bsize=bsize, showprogress=verbose
+        )[0]
         doc_mask = torch.full(embedded_docs.shape[:2], -float("inf"))
         return embedded_docs, doc_mask
 
@@ -627,28 +658,114 @@ class ColBERT(LateInteractionModel):
             query, documents, k, zero_index=zero_index_ranks, bsize=bsize
         )
 
-    def encode_index_free_documents(self, documents: list[str], bsize: int = 32):
-        raise NotImplementedError(
-            "encode_index_free_documents is not yet fully implemented"
+    def encode(
+        self,
+        documents: list[str],
+        document_metadatas: Optional[list[dict]] = None,
+        bsize: int = 32,
+        max_tokens: Union[Literal["auto"], int] = "auto",
+        verbose: bool = True,
+    ):
+        self._set_inference_max_tokens(documents=documents, max_tokens=max_tokens)
+        encodings, doc_masks = self._encode_index_free_documents(
+            documents, bsize=bsize, verbose=verbose
         )
-        # TODO: Add support for adding extra documents, not just replacing.
-        self.in_memory_collection = documents
-        self.in_memory_embed_docs, self.doc_masks = self._encode_index_free_documents(
-            documents, bsize=bsize
+        encodings = torch.cat(
+            [
+                encodings,
+                torch.zeros(
+                    (
+                        encodings.shape[0],
+                        self.inference_ckpt.doc_tokenizer.doc_maxlen
+                        - encodings.shape[1],
+                        encodings.shape[2],
+                    )
+                ),
+            ],
+            dim=1,
+        )
+        doc_masks = torch.cat(
+            [
+                doc_masks,
+                torch.full(
+                    (
+                        doc_masks.shape[0],
+                        self.inference_ckpt.colbert_config.max_doclen
+                        - doc_masks.shape[1],
+                    ),
+                    -float("inf"),
+                ),
+            ],
+            dim=1,
         )
 
-    def search_in_memory(self, queries: Union[str, list[str]], bsize: int = 32):
-        raise NotImplementedError("search_in_memory is not yet fully implemented")
+        if verbose:
+            print("Shapes:")
+            print(f"encodings: {encodings.shape}")
+            print(f"doc_masks: {doc_masks.shape}")
+
+        if hasattr(self, "in_memory_collection"):
+            if self.in_memory_metadata is not None:
+                if document_metadatas is None:
+                    self.in_memory_metadatas.extend([None] * len(documents))
+                else:
+                    self.in_memory_metadata.extend(document_metadatas)
+            elif document_metadatas is not None:
+                self.in_memory_metadata = [None] * len(self.in_memory_collection)
+                self.in_memory_metadata.extend(document_metadatas)
+
+            self.in_memory_collection.extend(documents)
+
+            # add 0 padding to encodings so they're self.inference_ckpt.doc_tokenizer.doc_maxlen length
+
+            self.in_memory_embed_docs = torch.cat(
+                [self.in_memory_embed_docs, encodings], dim=0
+            )
+            self.doc_masks = torch.cat([self.doc_masks, doc_masks], dim=0)
+
+        else:
+            self.in_memory_collection = documents
+            self.in_memory_metadata = document_metadatas
+            self.in_memory_embed_docs = encodings
+            self.doc_masks = doc_masks
+
+    def search_encoded_docs(
+        self,
+        queries: Union[str, list[str]],
+        k: int = 10,
+        bsize: int = 32,
+    ):
         queries = self._encode_index_free_queries(queries, bsize=bsize)
-        return self._index_free_search(
+        results = self._index_free_search(
             embedded_queries=queries,
             documents=self.in_memory_collection,
             embedded_docs=self.in_memory_embed_docs,
             doc_mask=self.doc_masks,
-            k=10,
-            zero_index=False,
+            k=k,
         )
+        if self.in_memory_metadata is not None:
+            for result in results:
+                result["document_metadata"] = self.in_memory_metadata[
+                    result["result_index"]
+                ]
+        return results
+
+    def clear_encoded_docs(self, force: bool = False):
+        if not force:
+            print(
+                "All in-memory encodings will be deleted in 10 seconds, interrupt now if you want to keep them!"
+            )
+            print("...")
+            time.sleep(10)
+        del self.in_memory_collection
+        del self.in_memory_metadata
+        del self.in_memory_embed_docs
+        del self.doc_masks
+        del self.inference_ckpt_len_set
 
     def __del__(self):
         # Clean up context
-        self.run_context.__exit__(None, None, None)
+        try:
+            self.run_context.__exit__(None, None, None)
+        except Exception:
+            print("INFO: Tried to clean up context but failed!")

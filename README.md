@@ -3,6 +3,8 @@
 _Easily use and train state of the art retrieval methods in any RAG pipeline. Designed for modularity and ease-of-use, backed by research._
 
 [![GitHub stars](https://img.shields.io/github/stars/bclavie/ragatouille.svg)](https://github.com/bclavie/ragatouille/stargazers)
+![Python Versions](https://img.shields.io/badge/Python-3.9_3.10_3.11-blue)
+[![Downloads](https://static.pepy.tech/badge/ragatouille/month)](https://pepy.tech/project/ragatouille)
 [![Documentation](https://img.shields.io/badge/docs-available-brightgreen)](https://ben.clavie.eu/ragatouille/)
 [![Twitter Follow](https://img.shields.io/twitter/follow/bclavie?style=social)](https://twitter.com/bclavie)
 
@@ -25,16 +27,16 @@ _If you want to read more about the motivations, philosophy, and why the late-in
 
 Want to give it a try? Nothing easier, just run `pip install ragatouille` and you're good to go!
 
-⚠️ RAGatouille currently has two running requirements: ⚠️
+⚠️ Running notes/requirements: ⚠️
 
 - If running inside a script, you must run it inside `if __name__ == "__main__"`
-- It does not currently support Google Colab **
+- Windows is not supported. RAGatouille doesn't appear to work outside WSL and has issues with WSL1. Some users have had success running RAGatouille in WSL2.
 
 ## Get Started
 
 RAGatouille makes it as simple as can be to use ColBERT! We want the library to work on two levels:
 
-- Strong, but parameterable defaults: you should be able to get started with just a few lines of code and still leverage the full power of ColBERT, and you should be able to tweak any relevant parameter if you need to!
+- Strong, but parameterizable defaults: you should be able to get started with just a few lines of code and still leverage the full power of ColBERT, and you should be able to tweak any relevant parameter if you need to!
 - Powerful yet simple re-usable components under-the-hood: any part of the library should be usable stand-alone. You can use our DataProcessor or our negative miners outside of `RAGPretrainedModel` and `RagTrainer`, and you can even write your own negative miner and use it in the pipeline if you want to!
 <!-- (more on [components](https://ben.clavie.eu/ragatouille/components)). -->
 
@@ -74,7 +76,7 @@ trainer.prepare_training_data(raw_data=my_data)
 
 ColBERT prefers to store processed training data on-file, which also makes easier to properly version training data via `wandb` or `dvc`. By default, it will write to `./data/`, but you can override this by passing a `data_out_path` argument to `prepare_training_data()`.
 
-Just like all things in RAGatouille, `prepare_training_data` uses strong defaults, but is also fully parameterable.
+Just like all things in RAGatouille, `prepare_training_data` uses strong defaults, but is also fully parameterizable.
 <!-- Check out the [Data Processing](https://ben.clavie.eu/ragatouille/data-processing) section of the docs! -->
 
 #### Running the Training/Fine-Tuning
@@ -145,7 +147,7 @@ Once this is done running, your index will be saved on-disk and ready to be quer
 - Embedding the documents and generating the bags-of-embeddings
 - Compressing the vectors and storing them on disk
 
-Curious about how this works? Check out the [Late-Interaction & ColBERT concept explainer](https://ben.clavie.eu/ragatouille/concepts)
+Curious about how this works? Check out the [Late-Interaction & ColBERT concept explainer](https://ben.clavie.eu/ragatouille/#late-interaction)
 <!-- or find out more about [indexing](https://ben.clavie.eu/ragatouille/indexing)! -->
 
 ### 🔎 Retrieving Documents

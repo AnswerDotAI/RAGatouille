@@ -1,6 +1,7 @@
 import os
 import random
 from collections import defaultdict
+from itertools import product
 from pathlib import Path
 from typing import Literal, Union
 
@@ -32,11 +33,12 @@ class TrainingDataProcessor:
         negative_label: int = 0,
         hard_negative_minimum_rank: int = 10,
     ):
-        self.negative_miner.min_rank = hard_negative_minimum_rank
         if self.negative_miner is None and mine_hard_negatives:
             raise ValueError(
                 "mine_hard_negatives is True but no negative miner was provided!"
             )
+        if self.negative_miner:
+            self.negative_miner.min_rank = hard_negative_minimum_rank
         if data_type == "pairs":
             self._process_raw_pairs(
                 raw_data=raw_data,
@@ -82,11 +84,19 @@ class TrainingDataProcessor:
                     triplets.append([q, p, n])
 
             extra_triplets_needed = max_triplets_per_query - initial_triplets_count
-            while extra_triplets_needed > 0:
-                p = self.passage_map[random.choice(all_pos_texts)]
-                n = self.passage_map[random.choice(negatives)]
-                triplets.append([q, p, n])
-                extra_triplets_needed -= 1
+            if extra_triplets_needed > 0:
+                all_combinations = list(product(all_pos_texts, negatives))
+                random.seed(42)
+                random.shuffle(all_combinations)
+                for pos, neg in all_combinations:
+                    p = self.passage_map[pos]
+                    n = self.passage_map[neg]
+                    if [q, p, n] not in triplets:
+                        triplets.append([q, p, n])
+                        extra_triplets_needed -= 1
+                        if extra_triplets_needed <= 0:
+                            break
+
         else:
             p = self.passage_map[positives[0]]
             for n in negatives:
@@ -100,9 +110,7 @@ class TrainingDataProcessor:
         - Randomly sampling from the full collection otherwise
         """
         if mine_hard_negatives:
-            hard_negatives = self.negative_miner.mine_hard_negatives(
-                query, n_new_negatives
-            )
+            hard_negatives = self.negative_miner.mine_hard_negatives(query)
             candidates = [
                 x
                 for x in hard_negatives
@@ -142,8 +150,8 @@ class TrainingDataProcessor:
                 )
             training_triplets += self._make_individual_triplets(
                 query=query,
-                positives=passages["positives"],
-                negatives=passages["negatives"],
+                positives=list(set(passages["positives"])),
+                negatives=list(set(passages["negatives"])),
             )
         self.training_triplets = training_triplets
 
@@ -257,4 +265,6 @@ class TrainingDataProcessor:
                 document = document.replace("\t", " ").replace("\n", " ")
                 f.write(f"{idx}\t{document}\n")
 
+        random.seed(42)
+        random.shuffle(self.training_triplets)
         srsly.write_jsonl(path / "triples.train.colbert.jsonl", self.training_triplets)

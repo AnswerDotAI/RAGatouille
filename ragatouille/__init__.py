@@ -1,4 +1,4 @@
-__version__ = "0.0.5a2"
+__version__ = "0.0.6c1"
 from .RAGPretrainedModel import RAGPretrainedModel
 from .RAGTrainer import RAGTrainer
 
