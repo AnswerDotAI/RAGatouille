@@ -304,10 +304,19 @@ def test_add_to_index(
     document_ids = set(list(pid_docid_map_data.values()))
 
     document_metadata_dict = srsly.read_json(document_metadata_path_fixture)
-    for doc_id in new_doc_ids + [existing_doc_id]:
+    # check for new docs
+    for doc_id in new_doc_ids:
         assert (
             doc_id in document_ids
-        ), f"Document ID {doc_id} should be in the pid_docid_map."
+        ), f"New document ID {doc_id} should be in the pid_docid_map."
         assert (
             doc_id in document_metadata_dict
-        ), f"Document ID {doc_id} should be in the document metadata."
+        ), f"New document ID {doc_id} should be in the document metadata."
+
+    # check for old doc
+    assert (
+        existing_doc_id in document_ids
+    ), f"Old document ID {doc_id} should be in the pid_docid_map."
+    assert (
+        existing_doc_id in document_metadata_dict
+    ), f"Old document ID {doc_id} should be in the document metadata."
