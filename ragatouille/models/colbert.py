@@ -421,14 +421,13 @@ class ColBERT(LateInteractionModel):
         )
 
         if not force_fast:
+            self.searcher.configure(ndocs=1024)
             if len(self.searcher.collection) < 10000:
                 self.searcher.configure(ncells=4)
                 self.searcher.configure(centroid_score_threshold=0.4)
-                self.searcher.configure(ndocs=512)
             elif len(self.searcher.collection) < 100000:
                 self.searcher.configure(ncells=2)
                 self.searcher.configure(centroid_score_threshold=0.45)
-                self.searcher.configure(ndocs=1024)
             # Otherwise, use defaults for k
         else:
             # Use fast settingss
@@ -458,9 +457,18 @@ class ColBERT(LateInteractionModel):
             for doc_id in doc_ids:
                 pids.extend(self.docid_pid_map[doc_id])
 
+        base_ncells = self.searcher.config.ncells
+        base_ndocs = self.searcher.config.ndocs
+
+        if k > len(self.searcher.collection):
+            print(
+                "WARNING: k value is larger than the number of documents in the index!",
+                f"Lowering k to {len(self.searcher.collection)}...",
+            )
+            k = len(self.searcher.collection)
         if k > (32 * self.searcher.config.ncells):
-            base_ncells = self.searcher.config.ncells
-            self.searcher.configure(ncells=k // 32 + 1)
+            self.searcher.configure(ncells=k // 32 + 2)
+        self.searcher.configure(ndocs=max(k * 4, 4096))
 
         if isinstance(query, str):
             results = [self._search(query, k, pids)]
@@ -490,8 +498,9 @@ class ColBERT(LateInteractionModel):
 
             to_return.append(result_for_query)
 
-        # Restore original ncells if it had to be changed for large k values
+        # Restore original ncells&ndocs if it had to be changed for large k values
         self.searcher.configure(ncells=base_ncells)
+        self.searcher.configure(ndocs=base_ndocs)
 
         if len(to_return) == 1:
             return to_return[0]
