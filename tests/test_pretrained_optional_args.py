@@ -316,7 +316,7 @@ def test_add_to_index(
     # check for old doc
     assert (
         existing_doc_id in document_ids
-    ), f"Old document ID {doc_id} should be in the pid_docid_map."
+    ), f"Old document ID {existing_doc_id} should be in the pid_docid_map."
     assert (
         existing_doc_id in document_metadata_dict
-    ), f"Old document ID {doc_id} should be in the document metadata."
+    ), f"Old document ID {existing_doc_id} should be in the document metadata."
