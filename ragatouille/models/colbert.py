@@ -171,12 +171,11 @@ class ColBERT(LateInteractionModel):
             self.docid_metadata_map.update(new_docid_metadata_map)
 
         if current_len + new_doc_len < 5000 or new_doc_len > current_len * 0.05:
+            combined_documents = self.collection + [doc["content"] for doc in new_documents_with_ids]
+            combined_pid_docid_map = {**self.pid_docid_map, **{pid + current_len: doc["document_id"] for pid, doc in enumerate(new_documents_with_ids)}}
             self.index(
-                [doc["content"] for doc in new_documents_with_ids],
-                {
-                    pid: doc["document_id"]
-                    for pid, doc in enumerate(new_documents_with_ids)
-                },
+                combined_documents,
+                combined_pid_docid_map,
                 docid_metadata_map=self.docid_metadata_map,
                 index_name=self.index_name,
                 max_document_length=self.config.doc_maxlen,

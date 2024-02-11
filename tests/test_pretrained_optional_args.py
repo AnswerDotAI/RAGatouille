@@ -282,6 +282,7 @@ def test_add_to_index(
     index_path_fixture,
 ):
     RAG = RAGPretrainedModel.from_index(index_path_fixture)
+    existing_doc_id = index_creation_inputs["document_ids"][0]  # Get an existing document ID
     new_doc_ids = ["mononoke", "sabaku_no_tami"]
     new_docs = [
         "Princess Mononoke (Japanese: もののけ姫, Hepburn: Mononoke-hime) is a 1997 Japanese animated epic historical fantasy film written and directed by Hayao Miyazaki and animated by Studio Ghibli for Tokuma Shoten, Nippon Television Network and Dentsu. The film stars the voices of Yōji Matsuda, Yuriko Ishida, Yūko Tanaka, Kaoru Kobayashi, Masahiko Nishimura, Tsunehiko Kamijo, Akihiro Miwa, Mitsuko Mori, and Hisaya Morishige.\nPrincess Mononoke is set in the late Muromachi period of Japan (approximately 1336 to 1573 AD) and includes fantasy elements. The story follows a young Emishi prince named Ashitaka, and his involvement in a struggle between the gods (kami) of a forest and the humans who consume its resources. The film deals with themes of Shinto and environmentalism.\nThe film was released in Japan on July 12, 1997, by Toho, and in the United States on October 29, 1999. This was the first Studio Ghibli film in the United States to be rated PG-13 by the MPA. It was a critical and commercial blockbuster, becoming the highest-grossing film in Japan of 1997, and also held Japan's box office record for domestic films until 2001's Spirited Away, another Miyazaki film. It was dubbed into English with a script by Neil Gaiman and initially distributed in North America by Miramax, where it sold well on home media despite not performing strongly at the box office. The film greatly increased Ghibli's popularity and influence outside Japan.",
@@ -301,10 +302,10 @@ def test_add_to_index(
     document_ids = set(list(pid_docid_map_data.values()))
 
     document_metadata_dict = srsly.read_json(document_metadata_path_fixture)
-    for new_doc_id in new_doc_ids:
+    for doc_id in new_doc_ids + [existing_doc_id]:
         assert (
-            new_doc_id in document_ids
-        ), f"New document ID {new_doc_id} should be in the pid_docid_map."
+            doc_id in document_ids
+        ), f"Document ID {doc_id} should be in the pid_docid_map."
         assert (
-            new_doc_id in document_metadata_dict
-        ), f"New document ID {new_doc_id} should be in the document metadata."
+            doc_id in document_metadata_dict
+        ), f"Document ID {doc_id} should be in the document metadata."
