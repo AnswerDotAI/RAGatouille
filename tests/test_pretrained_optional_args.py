@@ -218,30 +218,6 @@ def test_document_metadata_returned_in_search_results(
                 "metadata" not in result
             ), "The metadata should not be returned in the results."
 
-
-# def test_return_entire_document(index_creation_inputs, index_path_fixture):
-#     if index_creation_inputs["split_documents"] == True:
-#         RAG = RAGPretrainedModel.from_index(index_path_fixture)
-#         results = RAG.search(
-#             "when was miyazaki born",
-#             index_name=index_creation_inputs["index_name"],
-#             return_entire_document=True,
-#         )
-#         for result in results:
-#             assert (
-#                 "entire_document" in result
-#             ), "The full document should be returned in the results."
-#             doc_id = result["document_id"]
-#             expected_document = index_creation_inputs["collection"][
-#                 index_creation_inputs["document_ids"].index(doc_id)
-#             ]
-#             assert (
-#                 result["entire_document"] == expected_document
-#             ), f"The document for document_id {doc_id} should match the provided document."
-#     else:
-#         assert True, "This test is only relevant for split documents."
-
-
 # TODO: move this to a separate test file
 def test_delete_from_index(
     index_creation_inputs,
