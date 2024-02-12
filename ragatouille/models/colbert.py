@@ -163,19 +163,23 @@ class ColBERT(LateInteractionModel):
         new_documents_with_ids = [
             {"content": doc, "document_id": new_pid_docid_map[pid]}
             for pid, doc in enumerate(new_documents)
-            if new_pid_docid_map[pid] not in self.pid_docid_map
+            if new_pid_docid_map[pid] not in self.pid_docid_map.values()
         ]
 
         if new_docid_metadata_map is not None:
             self.docid_metadata_map = self.docid_metadata_map or {}
             self.docid_metadata_map.update(new_docid_metadata_map)
 
+        max_existing_pid = max(self.pid_docid_map.keys(), default=-1)
+        for idx, doc in enumerate(new_documents_with_ids, start=max_existing_pid + 1):
+            self.pid_docid_map[idx] = doc["document_id"]
+
+        combined_documents = self.collection + [doc["content"] for doc in new_documents_with_ids]
+
         if current_len + new_doc_len < 5000 or new_doc_len > current_len * 0.05:
-            combined_documents = self.collection + [doc["content"] for doc in new_documents_with_ids]
-            combined_pid_docid_map = {**self.pid_docid_map, **{pid + current_len: doc["document_id"] for pid, doc in enumerate(new_documents_with_ids)}}
             self.index(
                 combined_documents,
-                combined_pid_docid_map,
+                self.pid_docid_map,
                 docid_metadata_map=self.docid_metadata_map,
                 index_name=self.index_name,
                 max_document_length=self.config.doc_maxlen,
@@ -188,9 +192,6 @@ class ColBERT(LateInteractionModel):
             updater.add([doc["content"] for doc in new_documents_with_ids])
             updater.persist_to_disk()
 
-        self.pid_docid_map.update(
-            {pid: doc["document_id"] for pid, doc in enumerate(new_documents_with_ids)}
-        )
         self.docid_pid_map = defaultdict(list)
         for pid, docid in self.pid_docid_map.items():
             self.docid_pid_map[docid].append(pid)
