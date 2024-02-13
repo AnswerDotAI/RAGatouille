@@ -667,8 +667,8 @@ class ColBERT(LateInteractionModel):
         if isinstance(queries, str):
             queries = [queries]
         maxlen = max([int(len(x.split(" ")) * 1.35) for x in queries])
-        self.inference_ckpt.query_tokenizer.query_maxlen = min(
-            maxlen, self.base_model_max_tokens
+        self.inference_ckpt.query_tokenizer.query_maxlen = max(
+            min(maxlen, self.base_model_max_tokens), 32
         )
         embedded_queries = [
             x.unsqueeze(0)
