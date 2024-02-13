@@ -306,7 +306,7 @@ class RAGPretrainedModel:
         documents: list[str],
         k: int = 10,
         zero_index_ranks: bool = False,
-        bsize: int = 64,
+        bsize: Union[Literal["auto"], int] = "auto",
     ):
         """Encode documents and rerank them in-memory. Performance degrades rapidly with more documents.
 
@@ -337,7 +337,7 @@ class RAGPretrainedModel:
     def encode(
         self,
         documents: list[str],
-        bsize: int = 32,
+        bsize: Union[Literal["auto"], int] = "auto",
         document_metadatas: Optional[list[dict]] = None,
         verbose: bool = True,
         max_document_length: Union[Literal["auto"], int] = "auto",
