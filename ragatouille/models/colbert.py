@@ -14,6 +14,8 @@ from colbert.modeling.checkpoint import Checkpoint
 
 from ragatouille.models.base import LateInteractionModel
 
+# TODO: Move all bsize related calcs to `_set_bsize()`
+
 
 class ColBERT(LateInteractionModel):
     def __init__(
@@ -630,7 +632,7 @@ class ColBERT(LateInteractionModel):
         k: int,
         max_tokens: Union[Literal["auto"], int] = "auto",
         zero_index: bool = False,
-        bsize: Union[Literal["default"], int] = "default",
+        bsize: Union[Literal["auto"], int] = "auto",
     ):
         self._set_inference_max_tokens(documents=documents, max_tokens=max_tokens)
 
@@ -665,9 +667,9 @@ class ColBERT(LateInteractionModel):
     def _encode_index_free_queries(
         self,
         queries: Union[str, list[str]],
-        bsize: Union[Literal["default"], int] = "default",
+        bsize: Union[Literal["auto"], int] = "auto",
     ):
-        if bsize == "default":
+        if bsize == "auto":
             bsize = 32
         if isinstance(queries, str):
             queries = [queries]
@@ -684,16 +686,29 @@ class ColBERT(LateInteractionModel):
     def _encode_index_free_documents(
         self,
         documents: list[str],
-        bsize: Union[Literal["default"], int] = "default",
+        bsize: Union[Literal["auto"], int] = "auto",
         verbose: bool = True,
     ):
-        if bsize == "default":
+        if bsize == "auto":
             bsize = 32
             if self.inference_ckpt.doc_tokenizer.doc_maxlen > 512:
-                bsize = 32 / (
-                    2
-                    ** round(math.log(self.inference_ckpt.doc_tokenizer.doc_maxlen, 2))
+                bsize = max(
+                    1,
+                    int(
+                        32
+                        / (
+                            2
+                            ** round(
+                                math.log(
+                                    self.inference_ckpt.doc_tokenizer.doc_maxlen, 2
+                                )
+                            )
+                            / 512
+                        )
+                    ),
                 )
+                print("BSIZE:")
+                print(bsize)
         embedded_docs = self.inference_ckpt.docFromText(
             documents, bsize=bsize, showprogress=verbose
         )[0]
