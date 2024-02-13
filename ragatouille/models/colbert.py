@@ -630,7 +630,7 @@ class ColBERT(LateInteractionModel):
         k: int,
         max_tokens: Union[Literal["auto"], int] = "auto",
         zero_index: bool = False,
-        bsize: int = 32,
+        bsize: Union[Literal["default"], int] = "default",
     ):
         self._set_inference_max_tokens(documents=documents, max_tokens=max_tokens)
 
@@ -647,6 +647,14 @@ class ColBERT(LateInteractionModel):
                 "WARNING! Your documents have duplicate entries! ",
                 "This will slow down calculation and may yield subpar results",
             )
+
+        if bsize == "default":
+            bsize = 32
+            if self.inference_ckpt.doc_tokenizer.doc_maxlen > 512:
+                bsize = 32 / (
+                    2
+                    ** round(math.log(self.inference_ckpt.doc_tokenizer.doc_maxlen, 2))
+                )
 
         embedded_queries = self._encode_index_free_queries(query, bsize=bsize)
         embedded_docs, doc_mask = self._encode_index_free_documents(
