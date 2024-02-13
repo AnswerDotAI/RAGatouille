@@ -11,7 +11,6 @@ import torch
 from colbert import Indexer, IndexUpdater, Searcher, Trainer
 from colbert.infra import ColBERTConfig, Run, RunConfig
 from colbert.modeling.checkpoint import Checkpoint
-
 from ragatouille.models.base import LateInteractionModel
 
 
@@ -443,6 +442,14 @@ class ColBERT(LateInteractionModel):
 
         print("Searcher loaded!")
 
+    def _upgrade_searcher_maxlen(self, maxlen: int):
+        if maxlen < 32:
+            # Keep maxlen stable at 32 for short queries for easier visualisation
+            maxlen = 32
+        maxlen = min(maxlen, self.base_model_max_tokens)
+        self.searcher.config.query_maxlen = maxlen
+        self.searcher.checkpoint.query_tokenizer.query_maxlen = maxlen
+
     def search(
         self,
         query: Union[str, list[str]],
@@ -464,8 +471,12 @@ class ColBERT(LateInteractionModel):
                 pids.extend(self.docid_pid_map[doc_id])
 
         if isinstance(query, str):
+            query_length = int(len(query.split(" ") * 1.35))
+            self._upgrade_searcher_maxlen(query_length)
             results = [self._search(query, k, pids)]
         else:
+            longest_query_length = max([int(len(x.split(" ") * 1.35)) for x in query])
+            self._upgrade_searcher_maxlen(longest_query_length)
             results = self._batch_search(query, k)
 
         to_return = []
@@ -635,6 +646,10 @@ class ColBERT(LateInteractionModel):
     ):
         if isinstance(queries, str):
             queries = [queries]
+        maxlen = max([int(len(x.split(" ")) * 1.35) for x in queries])
+        self.inference_ckpt.query_tokenizer.query_maxlen = min(
+            maxlen, self.base_model_max_tokens
+        )
         embedded_queries = [
             x.unsqueeze(0)
             for x in self.inference_ckpt.queryFromText(queries, bsize=bsize)
