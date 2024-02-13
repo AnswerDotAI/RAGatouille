@@ -11,7 +11,6 @@ import torch
 from colbert import Indexer, IndexUpdater, Searcher, Trainer
 from colbert.infra import ColBERTConfig, Run, RunConfig
 from colbert.modeling.checkpoint import Checkpoint
-
 from ragatouille.models.base import LateInteractionModel
 
 
@@ -492,7 +491,7 @@ class ColBERT(LateInteractionModel):
             self._upgrade_searcher_maxlen(query_length)
             results = [self._search(query, k, pids)]
         else:
-            longest_query_length = max([int(len(x.split(" ") * 1.35)) for x in query])
+            longest_query_length = max([int(len(x.split(" ")) * 1.35) for x in query])
             self._upgrade_searcher_maxlen(longest_query_length)
             results = self._batch_search(query, k)
 
