@@ -39,6 +39,10 @@ RAGatouille API is a FastAPI application designed to provide an efficient and sc
    ```bash
    pip install -r requirements.txt
    ```
+   or use Poetry
+   ```bash
+   poetry install
+   ```
 4. Copy .env.example to .env:
    ```bash
    cp .env.example .env
@@ -48,7 +52,11 @@ RAGatouille API is a FastAPI application designed to provide an efficient and sc
 Start the FastAPI server with:
 
 ```bash
-uvicorn app.main:app --reload
+uvicorn ragatouille_serve.main:app --reload
+```
+or start with Poetry
+```bash
+poetry run uvicorn ragatouille_serve.main:app --reload
 ```
 The --reload flag enables hot reloading during development.
 

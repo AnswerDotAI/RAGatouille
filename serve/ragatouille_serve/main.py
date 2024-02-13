@@ -1,7 +1,7 @@
 from fastapi import FastAPI
-from app.api.api_v1 import api_router
-from app.core.config import Settings
-from app.utils.logging_config import setup_logging
+from ragatouille_serve.api.api_v1 import api_router
+from ragatouille_serve.core.config import Settings
+from ragatouille_serve.utils.logging_config import setup_logging
 import logging
 
 # Initialize FastAPI app and settings

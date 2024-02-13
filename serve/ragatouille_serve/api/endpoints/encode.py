@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from app.models.payloads import EncodeQuery, SearchEncodedDocsQuery, ClearEncodedDocsQuery
-from app.core.rag_model import get_rag_model
+from ragatouille_serve.models.payloads import EncodeQuery, SearchEncodedDocsQuery, ClearEncodedDocsQuery
+from ragatouille_serve.core.rag_model import get_rag_model
 import logging
 
 router = APIRouter()

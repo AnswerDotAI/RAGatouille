@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 from .payloads import index_documents, search_query, add_documents, delete_documents, rerank, encode, search_encoded, clear_encoded
-from app.main import app
+from ragatouille_serve.main import app
 
 client = TestClient(app)
 

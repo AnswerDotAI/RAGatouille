@@ -1,6 +1,6 @@
 from fastapi import APIRouter
-from app.api.endpoints import index, document_management, rerank
-from serve.app.api.endpoints import encode
+from ragatouille_serve.api.endpoints import index, document_management, rerank
+from ragatouille_serve.api.endpoints import encode
 
 # Versioned API router
 api_router = APIRouter()

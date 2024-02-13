@@ -1,5 +1,5 @@
 from fastapi import Depends
-from app.core.config import settings
+from ragatouille_serve.core.config import settings
 from ragatouille import RAGPretrainedModel
 import logging
 
