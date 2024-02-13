@@ -466,13 +466,12 @@ colorama = {version = "*", markers = "platform_system == \"Windows\""}
 
 [[package]]
 name = "colbert-ai"
-version = "0.2.18"
+version = "0.2.19"
 description = "Efficient and Effective Passage Search via Contextualized Late Interaction over BERT"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "colbert-ai-0.2.18.tar.gz", hash = "sha256:076effd5178eaeadacc2c480fc3088d89c36cdea163474cb8999e9c9bc506d3e"},
-    {file = "colbert_ai-0.2.18-py3-none-any.whl", hash = "sha256:c5786ba7aa3f1c121371f3d659d4b313fa2fb4c5d0cf04b105ffb3b807d76267"},
+    {file = "colbert-ai-0.2.19.tar.gz", hash = "sha256:4ebd4d30bbf9bb2dadfe7341b2d2faede31fa0d3f4129fb0571ad2200c9c3aa7"},
 ]
 
 [package.dependencies]
@@ -4221,4 +4220,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "066d1e61a4c75623e3ae5eb24d5e6feb0baf82906c1719e2bb69181130dde066"
+content-hash = "122fe11af91b8fc2cc853d7abe0da6786333720c1722696ab10e3e575fc5302f"
