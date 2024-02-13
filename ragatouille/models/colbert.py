@@ -426,14 +426,14 @@ class ColBERT(LateInteractionModel):
         )
 
         if not force_fast:
+            self.searcher.configure(ndocs=1024)
+            self.searcher.configure(ncells=16)
             if len(self.searcher.collection) < 10000:
-                self.searcher.configure(ncells=4)
+                self.searcher.configure(ncells=8)
                 self.searcher.configure(centroid_score_threshold=0.4)
-                self.searcher.configure(ndocs=512)
             elif len(self.searcher.collection) < 100000:
-                self.searcher.configure(ncells=2)
+                self.searcher.configure(ncells=4)
                 self.searcher.configure(centroid_score_threshold=0.45)
-                self.searcher.configure(ndocs=1024)
             # Otherwise, use defaults for k
         else:
             # Use fast settingss
@@ -471,6 +471,22 @@ class ColBERT(LateInteractionModel):
             for doc_id in doc_ids:
                 pids.extend(self.docid_pid_map[doc_id])
 
+        base_ncells = self.searcher.config.ncells
+        base_ndocs = self.searcher.config.ndocs
+
+        if k > len(self.searcher.collection):
+            print(
+                "WARNING: k value is larger than the number of documents in the index!",
+                f"Lowering k to {len(self.searcher.collection)}...",
+            )
+            k = len(self.searcher.collection)
+
+        # For smaller collections, we need a higher ncells value to ensure we return enough results
+        if k > (32 * self.searcher.config.ncells):
+            self.searcher.configure(ncells=min((k // 32 + 2), base_ncells))
+
+        self.searcher.configure(ndocs=max(k * 4, base_ndocs))
+
         if isinstance(query, str):
             query_length = int(len(query.split(" ")) * 1.35)
             self._upgrade_searcher_maxlen(query_length)
@@ -502,6 +518,10 @@ class ColBERT(LateInteractionModel):
                 result_for_query.append(result_dict)
 
             to_return.append(result_for_query)
+
+        # Restore original ncells&ndocs if it had to be changed for large k values
+        self.searcher.configure(ncells=base_ncells)
+        self.searcher.configure(ndocs=base_ndocs)
 
         if len(to_return) == 1:
             return to_return[0]
