@@ -648,14 +648,6 @@ class ColBERT(LateInteractionModel):
                 "This will slow down calculation and may yield subpar results",
             )
 
-        if bsize == "default":
-            bsize = 32
-            if self.inference_ckpt.doc_tokenizer.doc_maxlen > 512:
-                bsize = 32 / (
-                    2
-                    ** round(math.log(self.inference_ckpt.doc_tokenizer.doc_maxlen, 2))
-                )
-
         embedded_queries = self._encode_index_free_queries(query, bsize=bsize)
         embedded_docs, doc_mask = self._encode_index_free_documents(
             documents, bsize=bsize
@@ -671,8 +663,12 @@ class ColBERT(LateInteractionModel):
         )
 
     def _encode_index_free_queries(
-        self, queries: Union[str, list[str]], bsize: int = 32
+        self,
+        queries: Union[str, list[str]],
+        bsize: Union[Literal["default"], int] = "default",
     ):
+        if bsize == "default":
+            bsize = 32
         if isinstance(queries, str):
             queries = [queries]
         maxlen = max([int(len(x.split(" ")) * 1.35) for x in queries])
@@ -686,8 +682,18 @@ class ColBERT(LateInteractionModel):
         return embedded_queries
 
     def _encode_index_free_documents(
-        self, documents: list[str], bsize: int = 32, verbose: bool = True
+        self,
+        documents: list[str],
+        bsize: Union[Literal["default"], int] = "default",
+        verbose: bool = True,
     ):
+        if bsize == "default":
+            bsize = 32
+            if self.inference_ckpt.doc_tokenizer.doc_maxlen > 512:
+                bsize = 32 / (
+                    2
+                    ** round(math.log(self.inference_ckpt.doc_tokenizer.doc_maxlen, 2))
+                )
         embedded_docs = self.inference_ckpt.docFromText(
             documents, bsize=bsize, showprogress=verbose
         )[0]
@@ -702,6 +708,8 @@ class ColBERT(LateInteractionModel):
         zero_index_ranks: bool = False,
         bsize: int = 32,
     ):
+        self._set_inference_max_tokens(documents=documents, max_tokens="auto")
+        self.inference_ckpt_len_set = False
         return self._index_free_retrieve(
             query, documents, k, zero_index=zero_index_ranks, bsize=bsize
         )
