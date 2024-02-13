@@ -471,7 +471,7 @@ class ColBERT(LateInteractionModel):
                 pids.extend(self.docid_pid_map[doc_id])
 
         if isinstance(query, str):
-            query_length = int(len(query.split(" ") * 1.35))
+            query_length = int(len(query.split(" ")) * 1.35)
             self._upgrade_searcher_maxlen(query_length)
             results = [self._search(query, k, pids)]
         else:
