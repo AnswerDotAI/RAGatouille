@@ -65,6 +65,8 @@ class TrainingDataProcessor:
 
     def _make_individual_triplets(self, query, positives, negatives):
         """Create the training data in ColBERT(v1) format from raw lists of triplets"""
+        if len(positives) == 0 or len(negatives) == 0:
+            return []
         triplets = []
         q = self.query_map[query]
         random.seed(42)
