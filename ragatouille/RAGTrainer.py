@@ -60,6 +60,14 @@ class RAGTrainer:
             path: Union[str, Path] - Path to the directory where the data will be exported."""
         self.data_processor.export_training_data(path)
 
+    def _add_to_collection(self, content: Union[str, list, dict]):
+        if isinstance(content, str):
+            self.collection.append(content)
+        elif isinstance(content, list):
+            self.collection += [txt for txt in content if isinstance(txt, str)]
+        elif isinstance(content, dict):
+            self.collection += [content["content"]]
+
     def prepare_training_data(
         self,
         raw_data: Union[list[tuple], list[list]],
@@ -117,16 +125,12 @@ class RAGTrainer:
                 self.queries.add(x[0])
             else:
                 raise ValueError("Queries must be a strings.")
-            if isinstance(x[1], str):
-                self.collection.append(x[1])
-            elif isinstance(x[1], list):
-                self.collection += [txt for txt in x[1] if isinstance(txt, str)]
+
+            self._add_to_collection(x[1])
 
             if data_type == "triplets":
-                if isinstance(x[2], str):
-                    self.collection.append(x[2])
-                elif isinstance(x[2], list):
-                    self.collection += [txt for txt in x[2] if isinstance(txt, str)]
+                self._add_to_collection(x[2])
+
         self.collection = list(set(self.collection))
         seeded_shuffle(self.collection)
 
