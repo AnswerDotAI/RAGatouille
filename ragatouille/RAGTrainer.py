@@ -98,12 +98,16 @@ class RAGTrainer:
             self.collection += [doc for doc in all_documents if isinstance(doc, str)]
 
         self.data_dir = Path(data_out_path)
-        if len(raw_data[0]) == 2:
+        sample = raw_data[0]
+        if len(sample) == 2:
             data_type = "pairs"
+        elif len(sample) == 3:
             if pairs_with_labels:
                 data_type = "labeled_pairs"
-        elif len(raw_data[0]) == 3:
-            data_type = "triplets"
+                if sample[-1] not in [positive_label, negative_label]:
+                    raise ValueError(f"Invalid value for label: {sample}")
+            else:
+                data_type = "triplets"
         else:
             raise ValueError("Raw data must be a list of pairs or triplets of strings.")
 
@@ -118,7 +122,7 @@ class RAGTrainer:
             elif isinstance(x[1], list):
                 self.collection += [txt for txt in x[1] if isinstance(txt, str)]
 
-            if len(x) == 3:  # For triplets
+            if data_type == "triplets":
                 if isinstance(x[2], str):
                     self.collection.append(x[2])
                 elif isinstance(x[2], list):
