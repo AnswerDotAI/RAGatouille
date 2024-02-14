@@ -137,6 +137,8 @@ class RAGPretrainedModel:
         split_documents: bool = True,
         document_splitter_fn: Optional[Callable] = llama_index_sentence_splitter,
         preprocessing_fn: Optional[Union[Callable, list[Callable]]] = None,
+        index_type: Literal["PLAID", "FULL_VECTORS", "auto"] = "auto",
+        full_vector_precision: Literal["full", "half"] = "half",
     ):
         """Build an index from a list of documents.
 
@@ -187,6 +189,8 @@ class RAGPretrainedModel:
             index_name=index_name,
             max_document_length=max_document_length,
             overwrite=overwrite_index,
+            index_type=index_type,
+            full_vector_half_precision=full_vector_precision == "half",
         )
 
     def add_to_index(
@@ -339,6 +343,7 @@ class RAGPretrainedModel:
         documents: list[str],
         bsize: Union[Literal["auto"], int] = "auto",
         document_metadatas: Optional[list[dict]] = None,
+        document_ids: Optional[List] = None,
         verbose: bool = True,
         max_document_length: Union[Literal["auto"], int] = "auto",
     ):
@@ -351,10 +356,13 @@ class RAGPretrainedModel:
         """
         if verbose:
             print(f"Encoding {len(documents)} documents...")
+        if document_ids is not None:
+            document_ids = [str(uuid4()) for _ in documents]
         self.model.encode(
             documents=documents,
             bsize=bsize,
             document_metadatas=document_metadatas,
+            document_ids=document_ids,
             verbose=verbose,
             max_tokens=max_document_length,
         )

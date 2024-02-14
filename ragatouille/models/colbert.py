@@ -3,7 +3,7 @@ import os
 import time
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, List, Literal, Optional, TypeVar, Union
+from typing import Dict, List, Literal, Optional, Tuple, TypeVar, Union
 
 import numpy as np
 import srsly
@@ -33,7 +33,6 @@ class ColBERT(LateInteractionModel):
         self.collection = None
         self.pid_docid_map = None
         self.docid_metadata_map = None
-        self.in_memory_docs = []
         self.base_model_max_tokens = 512
         if n_gpu == -1:
             n_gpu = 1 if torch.cuda.device_count() == 0 else torch.cuda.device_count()
@@ -45,14 +44,30 @@ class ColBERT(LateInteractionModel):
             ckpt_config = ColBERTConfig.load_from_index(
                 str(pretrained_model_name_or_path)
             )
+            self.index_type = "PLAID"
+            try:
+                self.index_type = srsly.read_json(
+                    str(pretrained_model_name_or_path / "metadata.json")
+                )["index_type"]
+            except KeyError:
+                pass
+            assert self.index_type in [
+                "PLAID",
+                "FULL_VECTORS",
+            ], "Invalid index type! Must be PLAID or FULL_VECTORS."
             self.config = ckpt_config
             self.run_config = RunConfig(
                 nranks=n_gpu, experiment=self.config.experiment, root=self.config.root
             )
             split_root = str(pretrained_model_name_or_path).split("/")[:-1]
+
             self.config.root = "/".join(split_root)
             self.checkpoint = self.config.checkpoint
             self.index_name = self.config.index_name
+            if self.index_type == "FULL_VECTORS":
+                self.in_memory_index_docs = torch.load(
+                    pretrained_model_name_or_path / "doc_vectors.pt"
+                )
             self.collection = self._get_collection_from_file(
                 str(pretrained_model_name_or_path / "collection.json")
             )
@@ -294,16 +309,8 @@ class ColBERT(LateInteractionModel):
 
         print(f"Successfully deleted documents with these IDs: {document_ids}")
 
-    def index(
-        self,
-        collection: List[str],
-        pid_docid_map: Dict[int, str],
-        docid_metadata_map: Optional[dict] = None,
-        index_name: Optional["str"] = None,
-        max_document_length: int = 256,
-        overwrite: Union[bool, str] = "reuse",
-    ):
-        if torch.cuda.is_available():
+    def _plaid_index(self, overwrite: bool):
+        if torch.cuda.is_available() and self.index_type == "PLAID":
             import faiss
 
             if not hasattr(faiss, "StandardGpuResources"):
@@ -317,23 +324,6 @@ class ColBERT(LateInteractionModel):
                 )
                 print("Will continue with CPU indexing in 5 seconds...")
                 time.sleep(5)
-        self.config.doc_maxlen = max_document_length
-        if index_name is not None:
-            if self.index_name is not None:
-                print(
-                    f"New index_name received!",
-                    f"Updating current index_name ({self.index_name}) to {index_name}",
-                )
-            self.index_name = index_name
-        else:
-            if self.index_name is None:
-                print(
-                    f"No index_name received!",
-                    f"Using default index_name ({self.checkpoint}_new_index)",
-                )
-            self.index_name = self.checkpoint + "new_index"
-
-        self.collection = collection
 
         nbits = 2
         if len(self.collection) < 5000:
@@ -363,34 +353,144 @@ class ColBERT(LateInteractionModel):
             name=self.index_name, collection=self.collection, overwrite=overwrite
         )
 
+    def _save_index_metadata(self, full_vector_half_precision: bool) -> None:
+        if self.index_type == "PLAID":
+            index_metadata = srsly.read_json(self.index_path + "/metadata.json")
+        else:
+            index_metadata = {}
+            index_metadata["config"] = self.config.export()
+            index_metadata["full_vector_precision"] = (
+                "bfloat16" if full_vector_half_precision else "float32"
+            )
+        index_metadata["index_type"] = self.index_type
+        index_metadata["index_name"] = self.index_name
+        srsly.write_json(self.index_path + "/metadata.json", index_metadata)
+        self._write_collection_to_file(
+            self.collection, self.index_path + "/collection.json"
+        )
+        self._write_collection_to_file(
+            self.pid_docid_map, self.index_path + "/pid_docid_map.json"
+        )
+        if self.docid_metadata_map is not None:
+            self._write_collection_to_file(
+                self.docid_metadata_map, self.index_path + "/docid_metadata_map.json"
+            )
+
+    def _full_vectors_index(
+        self,
+        use_encoded_vectors: bool = False,
+        # half_precision: bool = True,
+        compress: bool = False,
+    ):
+        if use_encoded_vectors:
+            doc_vectors = self.in_memory_embed_docs
+            document_ids = self.in_memory_document_ids
+            # in-memory encoded docs don't support multiple chunks per document, so this shortcut is safe
+            self.pid_docid_map = {pid: docid for pid, docid in enumerate(document_ids)}
+            self.docid_pid_map = {
+                docid: pid for pid, docid in self.pid_docid_map.items()
+            }
+            self.docid_metadata_map = {
+                self.pid_docid_map[i]: self.in_memory_metadata[i]
+                for i in range(len(self.in_memory_metadata))
+            }
+        else:
+            print(f"Encoding {len(self.collection)} documents for indexing...")
+            doc_vectors = self._encode_index_free_documents(documents=self.collection)
+
+        self.in_memory_index_docs = doc_vectors
+
+        # check if self.index_path exists and if not, create it
+        if not os.path.exists(self.index_path):
+            os.makedirs(self.index_path)
+
+        if compress:
+            import gzip
+            import io
+
+            print("Saving vectors as compressed gzip file...")
+            # Serialize the tensor to a bytes object
+            buffer = io.BytesIO()
+            torch.save(self.in_memory_index_docs, buffer)
+
+            # Compress the serialized data with gzip
+            with gzip.open(
+                self.index_path + "/doc_vectors.pt.gz", "wb", compresslevel=1
+            ) as f:
+                f.write(buffer.getvalue())
+        else:
+            torch.save(self.in_memory_index_docs, self.index_path + "/doc_vectors.pt")
+
+    def index(
+        self,
+        collection: List[str],
+        pid_docid_map: Dict[int, str],
+        docid_metadata_map: Optional[dict] = None,
+        index_name: Optional["str"] = None,
+        max_document_length: int = 256,
+        overwrite: Union[bool, str] = "reuse",
+        index_type: Literal["PLAID", "FULL_VECTORS", "auto"] = "auto",
+        full_vector_half_precision: bool = True,
+    ):
+        print(len(collection) * max_document_length)
+        # If the collection is smaller than 256 tokens * 2000 docs or equivalent, default to uncompressed
+        if index_type == "auto" and len(collection) * max_document_length <= 512000:
+            index_type = "FULL_VECTORS"
+        else:
+            index_type = index_type
+
+        self.index_type = index_type
+        self.collection = collection
+        self.config.doc_maxlen = max_document_length
+
+        if index_name is not None:
+            if self.index_name is not None:
+                print(
+                    f"New index_name received!",
+                    f"Updating current index_name ({self.index_name}) to {index_name}",
+                )
+            self.index_name = index_name
+        else:
+            if self.index_name is None:
+                print(
+                    f"No index_name received!",
+                    f"Using default index_name ({self.checkpoint}_new_index)",
+                )
+            self.index_name = self.checkpoint + "new_index"
+
         self.index_path = str(
             Path(self.run_config.root)
             / Path(self.run_config.experiment)
             / "indexes"
             / self.index_name
         )
+
+        # TODO: File utils for index
+
         self.config.root = str(
             Path(self.run_config.root) / Path(self.run_config.experiment) / "indexes"
         )
-        self._write_collection_to_file(
-            self.collection, self.index_path + "/collection.json"
-        )
 
         self.pid_docid_map = pid_docid_map
-        self._write_collection_to_file(
-            self.pid_docid_map, self.index_path + "/pid_docid_map.json"
-        )
 
         # inverted mapping for returning full docs
         self.docid_pid_map = defaultdict(list)
         for pid, docid in self.pid_docid_map.items():
             self.docid_pid_map[docid].append(pid)
 
-        if docid_metadata_map is not None:
-            self._write_collection_to_file(
-                docid_metadata_map, self.index_path + "/docid_metadata_map.json"
+        self.docid_metadata_map = docid_metadata_map
+
+        if self.index_type == "FULL_VECTORS":
+            self._set_inference_max_tokens(
+                documents=None,
+                max_tokens=max_document_length,
             )
-            self.docid_metadata_map = docid_metadata_map
+            self._full_vectors_index()
+            # half_precision=full_vector_half_precision)
+        elif self.index_type == "PLAID":
+            self._plaid_index(overwrite=overwrite)
+
+        self._save_index_metadata(full_vector_half_precision=full_vector_half_precision)
 
         print("Done indexing!")
 
@@ -453,14 +553,13 @@ class ColBERT(LateInteractionModel):
         self.searcher.config.query_maxlen = maxlen
         self.searcher.checkpoint.query_tokenizer.query_maxlen = maxlen
 
-    def search(
+    def _search_plaid(
         self,
         query: Union[str, list[str]],
-        index_name: Optional["str"] = None,
-        k: int = 10,
-        force_fast: bool = False,
-        zero_index_ranks: bool = False,
-        doc_ids: Optional[List[str]] = None,
+        k: int,
+        index_name: Optional[str],
+        force_fast: bool,
+        doc_ids: Optional[List[str]],
     ):
         if self.searcher is None or (
             index_name is not None and self.index_name != index_name
@@ -483,7 +582,7 @@ class ColBERT(LateInteractionModel):
             )
             k = len(self.searcher.collection)
 
-        # For smaller collections, we need a higher ncells value to ensure we return enough results
+        # For smaller collections with high k, we need a higher ncells value to fetch enough results
         if k > (32 * self.searcher.config.ncells):
             self.searcher.configure(ncells=min((k // 32 + 2), base_ncells))
 
@@ -498,6 +597,48 @@ class ColBERT(LateInteractionModel):
             self._upgrade_searcher_maxlen(longest_query_length)
             results = self._batch_search(query, k)
 
+        self.searcher.configure(ncells=base_ncells)
+        self.searcher.configure(ndocs=base_ndocs)
+
+        return results
+
+    def _search_full_vectors(self, query: Union[str, list[str]], k: int):
+        embedded_queries = self._encode_index_free_queries(query)
+        results = []
+        for query in embedded_queries:
+            results_for_query = []
+            scores = self._colbert_score(query, self.in_memory_index_docs)
+            sorted_scores = sorted(enumerate(scores), key=lambda x: x[1], reverse=True)[
+                :k
+            ]
+            indices = [index for index, score in sorted_scores]
+            ranks = list(range(1, k + 1))
+            maxsim_scores = [score.item() for index, score in sorted_scores]
+
+            results_for_query = [indices, ranks, maxsim_scores]
+            results.append(results_for_query)
+
+        return results
+
+    def search(
+        self,
+        query: Union[str, list[str]],
+        index_name: Optional["str"] = None,
+        k: int = 10,
+        force_fast: bool = False,
+        zero_index_ranks: bool = False,
+        doc_ids: Optional[List[str]] = None,
+    ):
+        if self.index_type == "FULL_VECTORS":
+            results = self._search_full_vectors(query, k)
+        elif self.index_type == "PLAID":
+            results = self._search_plaid(
+                query=query,
+                k=k,
+                index_name=index_name,
+                force_fast=force_fast,
+                doc_ids=doc_ids,
+            )
         to_return = []
 
         for result in results:
@@ -522,8 +663,6 @@ class ColBERT(LateInteractionModel):
             to_return.append(result_for_query)
 
         # Restore original ncells&ndocs if it had to be changed for large k values
-        self.searcher.configure(ncells=base_ncells)
-        self.searcher.configure(ndocs=base_ndocs)
 
         if len(to_return) == 1:
             return to_return[0]
@@ -554,10 +693,7 @@ class ColBERT(LateInteractionModel):
 
             trainer.train(checkpoint=self.checkpoint)
 
-    def _colbert_score(self, Q, D_padded, D_mask):
-        if ColBERTConfig().total_visible_gpus > 0:
-            Q, D_padded, D_mask = Q.cuda(), D_padded.cuda(), D_mask.cuda()
-
+    def _colbert_score(self, Q, D_padded):
         assert Q.dim() == 3, Q.size()
         assert D_padded.dim() == 3, D_padded.size()
         assert Q.size(0) in [1, D_padded.size(0)]
@@ -571,7 +707,6 @@ class ColBERT(LateInteractionModel):
         embedded_queries,
         documents: list[str],
         embedded_docs,
-        doc_mask,
         k: int = 10,
         zero_index: bool = False,
     ):
@@ -579,7 +714,7 @@ class ColBERT(LateInteractionModel):
 
         for query in embedded_queries:
             results_for_query = []
-            scores = self._colbert_score(query, embedded_docs, doc_mask)
+            scores = self._colbert_score(query, embedded_docs)
             sorted_scores = sorted(enumerate(scores), key=lambda x: x[1], reverse=True)
             high_score_idxes = [index for index, _ in sorted_scores[:k]]
             for rank, doc_idx in enumerate(high_score_idxes):
@@ -600,30 +735,35 @@ class ColBERT(LateInteractionModel):
     def _set_inference_max_tokens(
         self, documents: list[str], max_tokens: Union[Literal["auto"], int] = "auto"
     ):
+        if max_tokens > self.base_model_max_tokens:
+            print(
+                "WARNING: Your max_tokens value is larger than the maximum tokens the model can handle!"
+            )
+            print(f"Truncating to {self.base_model_max_tokens}...")
+            max_tokens = self.base_model_max_tokens
         if (
             not hasattr(self, "inference_ckpt_len_set")
             or self.inference_ckpt_len_set is False
-        ):
-            if max_tokens == "auto" or max_tokens > self.base_model_max_tokens:
-                max_tokens = self.base_model_max_tokens
-                percentile_90 = np.percentile(
-                    [len(x.split(" ")) for x in documents], 90
+        ) and max_tokens == "auto":
+            max_tokens = self.base_model_max_tokens
+            percentile_90 = np.percentile([len(x.split(" ")) for x in documents], 90)
+            max_tokens = min(
+                math.floor((math.ceil((percentile_90 * 1.35) / 32) * 32) * 1.1),
+                self.base_model_max_tokens,
+            )
+            max_tokens = max(256, max_tokens)
+            if max_tokens > 300:
+                print(
+                    f"Your documents are roughly {percentile_90} tokens long at the 90th percentile!",
+                    "This is quite long and might slow down reranking!\n",
+                    "Provide fewer documents, build smaller chunks or run on GPU",
+                    "if it takes too long for your needs!",
                 )
-                max_tokens = min(
-                    math.floor((math.ceil((percentile_90 * 1.35) / 32) * 32) * 1.1),
-                    self.base_model_max_tokens,
-                )
-                max_tokens = max(256, max_tokens)
-                if max_tokens > 300:
-                    print(
-                        f"Your documents are roughly {percentile_90} tokens long at the 90th percentile!",
-                        "This is quite long and might slow down reranking!\n",
-                        "Provide fewer documents, build smaller chunks or run on GPU",
-                        "if it takes too long for your needs!",
-                    )
-            self.inference_ckpt.colbert_config.max_doclen = max_tokens
-            self.inference_ckpt.doc_tokenizer.doc_maxlen = max_tokens
-            self.inference_ckpt_len_set = True
+        else:
+            max_tokens = self.inference_ckpt.doc_tokenizer.doc_maxlen
+        self.inference_ckpt.colbert_config.max_doclen = max_tokens
+        self.inference_ckpt.doc_tokenizer.doc_maxlen = max_tokens
+        self.inference_ckpt_len_set = True
 
     def _index_free_retrieve(
         self,
@@ -651,15 +791,12 @@ class ColBERT(LateInteractionModel):
             )
 
         embedded_queries = self._encode_index_free_queries(query, bsize=bsize)
-        embedded_docs, doc_mask = self._encode_index_free_documents(
-            documents, bsize=bsize
-        )
+        embedded_docs = self._encode_index_free_documents(documents, bsize=bsize)
 
         return self._index_free_search(
             embedded_queries=embedded_queries,
             documents=documents,
             embedded_docs=embedded_docs,
-            doc_mask=doc_mask,
             k=k,
             zero_index=zero_index,
         )
@@ -688,7 +825,12 @@ class ColBERT(LateInteractionModel):
         documents: list[str],
         bsize: Union[Literal["auto"], int] = "auto",
         verbose: bool = True,
-    ):
+        half_precision: bool = False,
+        return_device: bool = False,
+    ) -> Union[Tuple[torch.Tensor, Union[torch.device, str]], torch.Tensor]:
+        device = "cuda" if torch.cuda.device_count() > 0 else "cpu"
+        dtype = torch.bfloat16 if half_precision else torch.float32
+
         if bsize == "auto":
             bsize = 32
             if self.inference_ckpt.doc_tokenizer.doc_maxlen > 512:
@@ -707,13 +849,36 @@ class ColBERT(LateInteractionModel):
                         )
                     ),
                 )
-                print("BSIZE:")
-                print(bsize)
         embedded_docs = self.inference_ckpt.docFromText(
             documents, bsize=bsize, showprogress=verbose
         )[0]
-        doc_mask = torch.full(embedded_docs.shape[:2], -float("inf"))
-        return embedded_docs, doc_mask
+
+        embedded_docs = embedded_docs.to(dtype)
+
+        # add 0 padding to encodings so they're self.inference_ckpt.doc_tokenizer.doc_maxlen length
+        encodings = torch.cat(
+            [
+                embedded_docs,
+                torch.zeros(
+                    (
+                        embedded_docs.shape[0],
+                        self.inference_ckpt.doc_tokenizer.doc_maxlen
+                        - embedded_docs.shape[1],
+                        embedded_docs.shape[2],
+                    )
+                )
+                .to(dtype)
+                .to(device),
+            ],
+            dim=1,
+        )
+        if verbose:
+            print("Shape:")
+            print(f"encodings: {encodings.shape}")
+
+        if return_device:
+            return encodings, device
+        return encodings
 
     def rank(
         self,
@@ -732,48 +897,21 @@ class ColBERT(LateInteractionModel):
     def encode(
         self,
         documents: list[str],
+        document_ids: list[str],
         document_metadatas: Optional[list[dict]] = None,
         bsize: int = 32,
         max_tokens: Union[Literal["auto"], int] = "auto",
         verbose: bool = True,
+        half_precision: bool = True,
     ):
         self._set_inference_max_tokens(documents=documents, max_tokens=max_tokens)
-        encodings, doc_masks = self._encode_index_free_documents(
-            documents, bsize=bsize, verbose=verbose
+        encodings = self._encode_index_free_documents(
+            documents,
+            bsize=bsize,
+            verbose=verbose,
+            half_precision=half_precision,
+            return_device=False,
         )
-        encodings = torch.cat(
-            [
-                encodings,
-                torch.zeros(
-                    (
-                        encodings.shape[0],
-                        self.inference_ckpt.doc_tokenizer.doc_maxlen
-                        - encodings.shape[1],
-                        encodings.shape[2],
-                    )
-                ),
-            ],
-            dim=1,
-        )
-        doc_masks = torch.cat(
-            [
-                doc_masks,
-                torch.full(
-                    (
-                        doc_masks.shape[0],
-                        self.inference_ckpt.colbert_config.max_doclen
-                        - doc_masks.shape[1],
-                    ),
-                    -float("inf"),
-                ),
-            ],
-            dim=1,
-        )
-
-        if verbose:
-            print("Shapes:")
-            print(f"encodings: {encodings.shape}")
-            print(f"doc_masks: {doc_masks.shape}")
 
         if hasattr(self, "in_memory_collection"):
             if self.in_memory_metadata is not None:
@@ -787,18 +925,25 @@ class ColBERT(LateInteractionModel):
 
             self.in_memory_collection.extend(documents)
 
-            # add 0 padding to encodings so they're self.inference_ckpt.doc_tokenizer.doc_maxlen length
-
             self.in_memory_embed_docs = torch.cat(
                 [self.in_memory_embed_docs, encodings], dim=0
             )
-            self.doc_masks = torch.cat([self.doc_masks, doc_masks], dim=0)
+            if len(set(self.in_memory_document_ids).union(set(document_ids))) != len(
+                self.in_memory_document_ids
+            ) + len(document_ids):
+                print(
+                    "WARNING: Your new documents have document_ids overlapping with the existing encoded collection!"
+                )
+                print(
+                    "This will not impact retrieval, but you may want to double-check your data processing."
+                )
+            self.in_memory_document_ids.extend(document_ids)
 
         else:
             self.in_memory_collection = documents
             self.in_memory_metadata = document_metadatas
+            self.in_memory_document_ids = document_ids
             self.in_memory_embed_docs = encodings
-            self.doc_masks = doc_masks
 
     def search_encoded_docs(
         self,
@@ -811,7 +956,6 @@ class ColBERT(LateInteractionModel):
             embedded_queries=queries,
             documents=self.in_memory_collection,
             embedded_docs=self.in_memory_embed_docs,
-            doc_mask=self.doc_masks,
             k=k,
         )
         if self.in_memory_metadata is not None:
@@ -820,6 +964,13 @@ class ColBERT(LateInteractionModel):
                     result["result_index"]
                 ]
         return results
+
+    def persist_encodings(
+        self,
+        compress: bool = True,
+        compression_level: int = 1,
+    ):
+        pass
 
     def clear_encoded_docs(self, force: bool = False):
         if not force:
@@ -831,7 +982,6 @@ class ColBERT(LateInteractionModel):
         del self.in_memory_collection
         del self.in_memory_metadata
         del self.in_memory_embed_docs
-        del self.doc_masks
         del self.inference_ckpt_len_set
 
     def __del__(self):
