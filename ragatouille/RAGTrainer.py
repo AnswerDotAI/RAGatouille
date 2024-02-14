@@ -12,13 +12,6 @@ from ragatouille.utils import seeded_shuffle
 class RAGTrainer:
     """Main trainer to fine-tune/train ColBERT models with a few lines."""
 
-    model: Union[LateInteractionModel, None] = None
-    negative_miner: Union[HardNegativeMiner, None] = None
-    collection: list[str] = []
-    queries: Union[list[str], None] = None
-    raw_data: Union[list[tuple], list[list], None] = None
-    training_triplets: list[list[int]] = list()
-
     def __init__(
         self,
         model_name: str,
@@ -38,15 +31,19 @@ class RAGTrainer:
         Returns:
             self (RAGTrainer): The current instance of RAGTrainer, with the base model initialised.
         """
-
         self.model_name = model_name
         self.pretrained_model_name = pretrained_model_name
         self.language_code = language_code
-        self.model = ColBERT(
+        self.model: Union[LateInteractionModel, None] = ColBERT(
             pretrained_model_name_or_path=pretrained_model_name,
             n_gpu=n_usable_gpus,
             training_mode=True,
         )
+        self.negative_miner: Union[HardNegativeMiner, None] = None
+        self.collection: list[str] = []
+        self.queries: Union[list[str], None] = None
+        self.raw_data: Union[list[tuple], list[list], None] = None
+        self.training_triplets: list[list[int]] = list()
 
     def add_documents(self, documents: list[str]):
         self.collection += documents
