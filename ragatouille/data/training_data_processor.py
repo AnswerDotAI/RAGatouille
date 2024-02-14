@@ -140,6 +140,8 @@ class TrainingDataProcessor:
         for query, positive in raw_data:
             if isinstance(positive, str):
                 positive = [positive]
+            elif isinstance(positive, dict):
+                positive = [positive["content"]]
             raw_grouped_triplets[query]["positives"] += positive
 
         for query, passages in raw_grouped_triplets.items():
