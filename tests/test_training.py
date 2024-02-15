@@ -4,11 +4,18 @@ import signal
 from contextlib import contextmanager
 
 import pytest
+import torch
 
 from ragatouille import RAGTrainer
 from ragatouille.data import CorpusProcessor, llama_index_sentence_splitter
 
 DATA_DIR = pathlib.Path(__file__).parent / "data"
+
+
+skip_if_no_cuda = pytest.mark.skipif(
+    not torch.cuda.is_available(),
+    reason="Skip test. Training currently only works when CUDA is available",
+)
 
 
 class TimeoutException(Exception):
@@ -30,6 +37,7 @@ def time_limit(seconds):
         signal.alarm(0)
 
 
+@skip_if_no_cuda
 @pytest.mark.slow
 def test_training(tmp_path):
     """This test is based on the content of examples/02-basic_training.ipynb
@@ -71,7 +79,7 @@ def test_training(tmp_path):
         mine_hard_negatives=True,
     )
     try:
-        with time_limit(10):
+        with time_limit(30):
             trainer.train(
                 batch_size=32,
                 nbits=4,  # How many bits will the trained model use when compressing indexes
