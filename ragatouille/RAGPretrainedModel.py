@@ -137,6 +137,7 @@ class RAGPretrainedModel:
         split_documents: bool = True,
         document_splitter_fn: Optional[Callable] = llama_index_sentence_splitter,
         preprocessing_fn: Optional[Union[Callable, list[Callable]]] = None,
+        bsize: int = 32,
     ):
         """Build an index from a list of documents.
 
@@ -149,6 +150,7 @@ class RAGPretrainedModel:
             split_documents (bool): Whether to split documents into chunks.
             document_splitter_fn (Optional[Callable]): A function to split documents into chunks. If None and by default, will use the llama_index_sentence_splitter.
             preprocessing_fn (Optional[Union[Callable, list[Callable]]]): A function or list of functions to preprocess documents. If None and by default, will not preprocess documents.
+            bsize (int): The batch size to use for encoding the passages.
 
         Returns:
             index (str): The path to the index that was built.
@@ -187,6 +189,7 @@ class RAGPretrainedModel:
             index_name=index_name,
             max_document_length=max_document_length,
             overwrite=overwrite_index,
+            bsize=bsize,
         )
 
     def add_to_index(

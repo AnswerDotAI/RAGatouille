@@ -302,6 +302,7 @@ class ColBERT(LateInteractionModel):
         index_name: Optional["str"] = None,
         max_document_length: int = 256,
         overwrite: Union[bool, str] = "reuse",
+        bsize: int = 32,
     ):
         if torch.cuda.is_available():
             import faiss
@@ -341,7 +342,7 @@ class ColBERT(LateInteractionModel):
         elif len(self.collection) < 10000:
             nbits = 4
         self.config = ColBERTConfig.from_existing(
-            self.config, ColBERTConfig(nbits=nbits)
+            self.config, ColBERTConfig(nbits=nbits, index_bsize=bsize)
         )
 
         if len(self.collection) > 100000:
