@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Callable, List, Literal, Optional, TypeVar, Union
+from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, TypeVar, Union
 from uuid import uuid4
 
 from langchain.retrievers.document_compressors.base import BaseDocumentCompressor
@@ -126,6 +126,48 @@ class RAGPretrainedModel:
 
         return document_ids, docid_metadata_map
 
+    def _process_corpus(
+        self,
+        collection: List[str],
+        document_ids: List[str],
+        document_metadatas: List[Dict[Any, Any]],
+        document_splitter_fn: Optional[Callable[[str], List[str]]],
+        preprocessing_fn: Optional[Callable[[str], str]],
+        max_document_length: int,
+    ) -> Tuple[List[str], Dict[int, str], Dict[str, Dict[Any, Any]]]:
+        """
+        Processes a collection of documents by assigning unique IDs, splitting documents if necessary,
+        applying preprocessing, and organizing metadata.
+        """
+        document_ids, docid_metadata_map = self._process_metadata(
+            document_ids=document_ids,
+            document_metadatas=document_metadatas,
+            collection_len=len(collection),
+        )
+
+        if document_splitter_fn is not None or preprocessing_fn is not None:
+            self.corpus_processor = CorpusProcessor(
+                document_splitter_fn=document_splitter_fn,
+                preprocessing_fn=preprocessing_fn,
+            )
+            collection_with_ids = self.corpus_processor.process_corpus(
+                collection,
+                document_ids,
+                chunk_size=max_document_length,
+            )
+        else:
+            collection_with_ids = [
+                {"document_id": x, "content": y}
+                for x, y in zip(document_ids, collection)
+            ]
+
+        pid_docid_map = {
+            index: item["document_id"] for index, item in enumerate(collection_with_ids)
+        }
+        collection = [x["content"] for x in collection_with_ids]
+
+        return collection, pid_docid_map, docid_metadata_map
+
     def index(
         self,
         collection: list[str],
@@ -155,33 +197,16 @@ class RAGPretrainedModel:
         Returns:
             index (str): The path to the index that was built.
         """
-
-        document_ids, docid_metadata_map = self._process_metadata(
-            document_ids=document_ids,
-            document_metadatas=document_metadatas,
-            collection_len=len(collection),
+        if not split_documents:
+            document_splitter_fn = None
+        collection, pid_docid_map, docid_metadata_map = self._process_corpus(
+            collection,
+            document_ids,
+            document_metadatas,
+            document_splitter_fn,
+            preprocessing_fn,
+            max_document_length,
         )
-
-        if split_documents or preprocessing_fn is not None:
-            self.corpus_processor = CorpusProcessor(
-                document_splitter_fn=document_splitter_fn if split_documents else None,
-                preprocessing_fn=preprocessing_fn,
-            )
-            collection_with_ids = self.corpus_processor.process_corpus(
-                collection,
-                document_ids,
-                chunk_size=max_document_length,
-            )
-        else:
-            collection_with_ids = [
-                {"document_id": x, "content": y}
-                for x, y in zip(document_ids, collection)
-            ]
-
-        pid_docid_map = {
-            index: item["document_id"] for index, item in enumerate(collection_with_ids)
-        }
-        collection = [x["content"] for x in collection_with_ids]
         return self.model.index(
             collection,
             pid_docid_map=pid_docid_map,
@@ -210,34 +235,21 @@ class RAGPretrainedModel:
             new_document_metadatas (Optional[list[dict]]): An optional list of metadata dicts
             index_name (Optional[str]): The name of the index to add documents to. If None and by default, will add documents to the already initialised one.
         """
-        new_document_ids, new_docid_metadata_map = self._process_metadata(
-            document_ids=new_document_ids,
-            document_metadatas=new_document_metadatas,
-            collection_len=len(new_collection),
+        if not split_documents:
+            document_splitter_fn = None
+
+        (
+            new_collection,
+            new_pid_docid_map,
+            new_docid_metadata_map,
+        ) = self._process_corpus(
+            new_collection,
+            new_document_ids,
+            new_document_metadatas,
+            document_splitter_fn,
+            preprocessing_fn,
+            self.model.config.doc_maxlen,
         )
-
-        if split_documents or preprocessing_fn is not None:
-            self.corpus_processor = CorpusProcessor(
-                document_splitter_fn=document_splitter_fn if split_documents else None,
-                preprocessing_fn=preprocessing_fn,
-            )
-            new_collection_with_ids = self.corpus_processor.process_corpus(
-                new_collection,
-                new_document_ids,
-                chunk_size=self.model.config.doc_maxlen,
-            )
-        else:
-            new_collection_with_ids = [
-                {"document_id": x, "content": y}
-                for x, y in zip(new_document_ids, new_collection)
-            ]
-
-        new_collection = [x["content"] for x in new_collection_with_ids]
-
-        new_pid_docid_map = {
-            index: item["document_id"]
-            for index, item in enumerate(new_collection_with_ids)
-        }
 
         self.model.add_to_index(
             new_collection,
