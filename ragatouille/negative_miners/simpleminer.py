@@ -62,7 +62,9 @@ class SimpleMiner(HardNegativeMiner):
             self.model.stop_multi_process_pool(pool)
         else:
             embeds = self.model.encode(collection, batch_size=batch_size)
-        
+
+        print("All documents embedded, now adding to index...")
+
         self.max_rank = min(110, int(len(collection) // 10))
         self.max_rank = min(self.max_rank, len(collection))
 
@@ -82,6 +84,7 @@ class SimpleMiner(HardNegativeMiner):
             id_to_vector[i] = emb
             self.corpus_map[i] = collection[i]
         del embeds
+
         self.voyager_index.add_items(
             vectors=[x for x in id_to_vector.values()],
             ids=[x for x in id_to_vector.keys()],
