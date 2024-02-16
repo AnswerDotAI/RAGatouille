@@ -82,7 +82,6 @@ class SimpleMiner(HardNegativeMiner):
             id_to_vector[i] = emb
             self.corpus_map[i] = collection[i]
         del embeds
-        print("length of id_to_vector", len(id_to_vector))
         self.voyager_index.add_items(
             vectors=[x for x in id_to_vector.values()],
             ids=[x for x in id_to_vector.keys()],
