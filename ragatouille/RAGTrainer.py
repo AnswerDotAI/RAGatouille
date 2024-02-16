@@ -94,9 +94,7 @@ class RAGTrainer:
         Returns:
             data_out_path: Union[str, Path] - Path to the directory where the data has been exported.
         """
-        if all_documents is not None:
-            self.collection += [doc for doc in all_documents if isinstance(doc, str)]
-
+        self.collection = (self.collection or []) + [doc['content'] for doc in all_documents]
         self.data_dir = Path(data_out_path)
         if len(raw_data[0]) == 2:
             data_type = "pairs"

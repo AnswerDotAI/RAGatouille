@@ -137,8 +137,8 @@ class TrainingDataProcessor:
 
         for query, positive in raw_data:
             if isinstance(positive, str):
-                positive = [positive]
-            raw_grouped_triplets[query]["positives"] += positive
+                raise ValueError
+            raw_grouped_triplets[query]["positives"].append(positive['content'])
 
         for query, passages in raw_grouped_triplets.items():
             if n_new_negatives > 0:
