@@ -201,6 +201,7 @@ class RAGPretrainedModel:
         split_documents: bool = True,
         document_splitter_fn: Optional[Callable] = llama_index_sentence_splitter,
         preprocessing_fn: Optional[Union[Callable, list[Callable]]] = None,
+        bsize: int = 32,
     ):
         """Add documents to an existing index.
 
@@ -208,6 +209,7 @@ class RAGPretrainedModel:
             new_collection (list[str]): The documents to add to the index.
             new_document_metadatas (Optional[list[dict]]): An optional list of metadata dicts
             index_name (Optional[str]): The name of the index to add documents to. If None and by default, will add documents to the already initialised one.
+            bsize (int): The batch size to use for encoding the passages.
         """
         new_document_ids, new_docid_metadata_map = self._process_metadata(
             document_ids=new_document_ids,
@@ -243,6 +245,7 @@ class RAGPretrainedModel:
             new_pid_docid_map,
             new_docid_metadata_map=new_docid_metadata_map,
             index_name=index_name,
+            bsize=bsize,
         )
 
     def delete_from_index(

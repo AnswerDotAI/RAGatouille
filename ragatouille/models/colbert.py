@@ -124,6 +124,7 @@ class ColBERT(LateInteractionModel):
         new_pid_docid_map: Dict[int, str],
         new_docid_metadata_map: Optional[List[dict]] = None,
         index_name: Optional[str] = None,
+        bsize: int = 32,
     ):
         self.index_name = index_name if index_name is not None else self.index_name
         if self.index_name is None:
@@ -187,8 +188,12 @@ class ColBERT(LateInteractionModel):
                 index_name=self.index_name,
                 max_document_length=self.config.doc_maxlen,
                 overwrite="force_silent_overwrite",
+                bsize=bsize,
             )
         else:
+            if self.config.index_bsize != bsize: # Update bsize if it's different
+                self.config.index_bsize = bsize            
+
             updater = IndexUpdater(
                 config=self.config, searcher=searcher, checkpoint=self.checkpoint
             )
