@@ -43,7 +43,7 @@ RAGatouille makes it as simple as can be to use ColBERT! We want the library to 
 In this section, we'll quickly walk you through the three core aspects of RAGatouille:
 
 - [🚀 Training and Fine-Tuning ColBERT models](#training-and-fine-tuning)
-- [🗄️ Embedding and Indexing Documents](#indexing)
+- [🗄️ Embedding and Indexing Documents](#%EF%B8%8F-indexing)
 - [🔎 Retrieving documents](#retrieving-documents)
 
 ➡️ If you want just want to see fully functional code examples, head over to the [examples](https://github.com/bclavie/RAGatouille/tree/main/examples)⬅️
