@@ -11,7 +11,6 @@ import torch
 from colbert import Indexer, IndexUpdater, Searcher, Trainer
 from colbert.infra import ColBERTConfig, Run, RunConfig
 from colbert.modeling.checkpoint import Checkpoint
-
 from ragatouille.models.base import LateInteractionModel
 
 # TODO: Move all bsize related calcs to `_set_bsize()`
@@ -718,7 +717,9 @@ class ColBERT(LateInteractionModel):
         embedded_docs = self.inference_ckpt.docFromText(
             documents, bsize=bsize, showprogress=verbose
         )[0]
-        doc_mask = torch.full(embedded_docs.shape[:2], -float("inf"))
+        doc_mask = torch.full(embedded_docs.shape[:2], -float("inf")).to(
+            embedded_docs.device
+        )
         return embedded_docs, doc_mask
 
     def rank(
@@ -771,7 +772,7 @@ class ColBERT(LateInteractionModel):
                         - doc_masks.shape[1],
                     ),
                     -float("inf"),
-                ).to(device=encodings.device),
+                ).to(device=doc_masks.device),
             ],
             dim=1,
         )
