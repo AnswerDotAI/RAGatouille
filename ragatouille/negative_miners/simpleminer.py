@@ -13,12 +13,15 @@ from .base import HardNegativeMiner
 class DenseModels(Enum):
     en_small = "BAAI/bge-small-en-v1.5"
     zh_small = "thenlper/gte-small-zh"
+    fr_small = "OrdalieTech/Solon-embeddings-base-0.1"
     other_small = "intfloat/multilingual-e5-small"
     en_base = "BAAI/bge-base-en-v1.5"
     zh_base = "thenlper/gte-base-zh"
+    fr_base = "OrdalieTech/Solon-embeddings-base-0.1"
     other_base = "intfloat/multilingual-e5-base"
     en_large = "BAAI/bge-large-en-v1.5"
     zh_large = "thenlper/gte-large-zh"
+    fr_large = "OrdalieTech/Solon-embeddings-large-0.1"
     other_large = "intfloat/multilingual-e5-large"
 
 
@@ -36,7 +39,7 @@ class SimpleMiner(HardNegativeMiner):
         self.n_gpu = torch.cuda.device_count()
         self.target_language = language_code
         self.model_size = model_size
-        if language_code not in ["en", "zh"]:
+        if language_code not in ["en", "zh", "fr"]:
             language_code = "other"
         self.model_name = f"{language_code}_{model_size}"
         hub_model = DenseModels[self.model_name].value
