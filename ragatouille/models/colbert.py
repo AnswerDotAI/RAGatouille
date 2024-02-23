@@ -718,7 +718,9 @@ class ColBERT(LateInteractionModel):
         embedded_docs = self.inference_ckpt.docFromText(
             documents, bsize=bsize, showprogress=verbose
         )[0]
-        doc_mask = torch.full(embedded_docs.shape[:2], -float("inf"))
+        doc_mask = torch.full(embedded_docs.shape[:2], -float("inf")).to(
+            embedded_docs.device
+        )
         return embedded_docs, doc_mask
 
     def rank(
@@ -771,7 +773,7 @@ class ColBERT(LateInteractionModel):
                         - doc_masks.shape[1],
                     ),
                     -float("inf"),
-                ).to(device=encodings.device),
+                ).to(device=doc_masks.device),
             ],
             dim=1,
         )
