@@ -11,7 +11,6 @@ import torch
 from colbert import Indexer, IndexUpdater, Searcher, Trainer
 from colbert.infra import ColBERTConfig, Run, RunConfig
 from colbert.modeling.checkpoint import Checkpoint
-
 from ragatouille.models.base import LateInteractionModel
 
 # TODO: Move all bsize related calcs to `_set_bsize()`
@@ -751,7 +750,7 @@ class ColBERT(LateInteractionModel):
                         - encodings.shape[1],
                         encodings.shape[2],
                     )
-                ),
+                ).to(device=encodings.device),
             ],
             dim=1,
         )
@@ -765,7 +764,7 @@ class ColBERT(LateInteractionModel):
                         - doc_masks.shape[1],
                     ),
                     -float("inf"),
-                ),
+                ).to(device=encodings.device),
             ],
             dim=1,
         )
