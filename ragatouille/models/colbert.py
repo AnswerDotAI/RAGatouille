@@ -194,8 +194,8 @@ class ColBERT(LateInteractionModel):
                 bsize=bsize,
             )
         else:
-            if self.config.bsize != bsize:  # Update bsize if it's different
-                self.config.bsize = bsize
+            if self.config.index_bsize != bsize:  # Update bsize if it's different
+                self.config.index_bsize = bsize
 
             updater = IndexUpdater(
                 config=self.config, searcher=searcher, checkpoint=self.checkpoint
@@ -347,7 +347,7 @@ class ColBERT(LateInteractionModel):
         elif len(self.collection) < 10000:
             nbits = 4
         self.config = ColBERTConfig.from_existing(
-            self.config, ColBERTConfig(nbits=nbits, bsize=bsize)
+            self.config, ColBERTConfig(nbits=nbits, index_bsize=bsize)
         )
 
         if len(self.collection) > 100000:
