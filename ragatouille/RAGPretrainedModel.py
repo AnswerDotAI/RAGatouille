@@ -179,6 +179,7 @@ class RAGPretrainedModel:
         split_documents: bool = True,
         document_splitter_fn: Optional[Callable] = llama_index_sentence_splitter,
         preprocessing_fn: Optional[Union[Callable, list[Callable]]] = None,
+        bsize: int = 32,
     ):
         """Build an index from a list of documents.
 
@@ -191,6 +192,7 @@ class RAGPretrainedModel:
             split_documents (bool): Whether to split documents into chunks.
             document_splitter_fn (Optional[Callable]): A function to split documents into chunks. If None and by default, will use the llama_index_sentence_splitter.
             preprocessing_fn (Optional[Union[Callable, list[Callable]]]): A function or list of functions to preprocess documents. If None and by default, will not preprocess documents.
+            bsize (int): The batch size to use for encoding the passages.
 
         Returns:
             index (str): The path to the index that was built.
@@ -212,6 +214,7 @@ class RAGPretrainedModel:
             index_name=index_name,
             max_document_length=max_document_length,
             overwrite=overwrite_index,
+            bsize=bsize,
         )
 
     def add_to_index(
@@ -223,6 +226,7 @@ class RAGPretrainedModel:
         split_documents: bool = True,
         document_splitter_fn: Optional[Callable] = llama_index_sentence_splitter,
         preprocessing_fn: Optional[Union[Callable, list[Callable]]] = None,
+        bsize: int = 32,
     ):
         """Add documents to an existing index.
 
@@ -230,6 +234,7 @@ class RAGPretrainedModel:
             new_collection (list[str]): The documents to add to the index.
             new_document_metadatas (Optional[list[dict]]): An optional list of metadata dicts
             index_name (Optional[str]): The name of the index to add documents to. If None and by default, will add documents to the already initialised one.
+            bsize (int): The batch size to use for encoding the passages.
         """
         if not split_documents:
             document_splitter_fn = None
@@ -252,6 +257,7 @@ class RAGPretrainedModel:
             new_pid_docid_map,
             new_docid_metadata_map=new_docid_metadata_map,
             index_name=index_name,
+            bsize=bsize,
         )
 
     def delete_from_index(
