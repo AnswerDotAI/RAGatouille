@@ -190,8 +190,8 @@ class ColBERT(LateInteractionModel):
                 bsize=bsize,
             )
         else:
-            if self.config.index_bsize != bsize: # Update bsize if it's different
-                self.config.index_bsize = bsize            
+            if self.config.index_bsize != bsize:  # Update bsize if it's different
+                self.config.index_bsize = bsize
 
             updater = IndexUpdater(
                 config=self.config, searcher=searcher, checkpoint=self.checkpoint
