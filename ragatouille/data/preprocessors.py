@@ -1,5 +1,9 @@
-from llama_index import Document
-from llama_index.text_splitter import SentenceSplitter
+try:
+    from llama_index import Document
+    from llama_index.text_splitter import SentenceSplitter
+except ImportError:
+    from llama_index.core import Document
+    from llama_index.core.text_splitter import SentenceSplitter
 
 
 def llama_index_sentence_splitter(

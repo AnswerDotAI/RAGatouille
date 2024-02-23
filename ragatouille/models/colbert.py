@@ -14,6 +14,8 @@ from colbert.modeling.checkpoint import Checkpoint
 
 from ragatouille.models.base import LateInteractionModel
 
+# TODO: Move all bsize related calcs to `_set_bsize()`
+
 
 class ColBERT(LateInteractionModel):
     def __init__(
@@ -32,6 +34,7 @@ class ColBERT(LateInteractionModel):
         self.pid_docid_map = None
         self.docid_metadata_map = None
         self.in_memory_docs = []
+        self.base_model_max_tokens = 512
         if n_gpu == -1:
             n_gpu = 1 if torch.cuda.device_count() == 0 else torch.cuda.device_count()
 
@@ -101,6 +104,9 @@ class ColBERT(LateInteractionModel):
             self.inference_ckpt = Checkpoint(
                 self.checkpoint, colbert_config=self.config
             )
+            self.base_model_max_tokens = (
+                self.inference_ckpt.bert.config.max_position_embeddings
+            )
 
         self.run_context = Run().context(self.run_config)
         self.run_context.__enter__()  # Manually enter the context
@@ -118,6 +124,7 @@ class ColBERT(LateInteractionModel):
         new_pid_docid_map: Dict[int, str],
         new_docid_metadata_map: Optional[List[dict]] = None,
         index_name: Optional[str] = None,
+        bsize: int = 32,
     ):
         self.index_name = index_name if index_name is not None else self.index_name
         if self.index_name is None:
@@ -184,8 +191,12 @@ class ColBERT(LateInteractionModel):
                 index_name=self.index_name,
                 max_document_length=self.config.doc_maxlen,
                 overwrite="force_silent_overwrite",
+                bsize=bsize,
             )
         else:
+            if self.config.index_bsize != bsize:  # Update bsize if it's different
+                self.config.index_bsize = bsize
+
             updater = IndexUpdater(
                 config=self.config, searcher=searcher, checkpoint=self.checkpoint
             )
@@ -296,6 +307,7 @@ class ColBERT(LateInteractionModel):
         index_name: Optional["str"] = None,
         max_document_length: int = 256,
         overwrite: Union[bool, str] = "reuse",
+        bsize: int = 32,
     ):
         if torch.cuda.is_available():
             import faiss
@@ -335,7 +347,7 @@ class ColBERT(LateInteractionModel):
         elif len(self.collection) < 10000:
             nbits = 4
         self.config = ColBERTConfig.from_existing(
-            self.config, ColBERTConfig(nbits=nbits)
+            self.config, ColBERTConfig(nbits=nbits, index_bsize=bsize)
         )
 
         if len(self.collection) > 100000:
@@ -439,6 +451,14 @@ class ColBERT(LateInteractionModel):
 
         print("Searcher loaded!")
 
+    def _upgrade_searcher_maxlen(self, maxlen: int):
+        if maxlen < 32:
+            # Keep maxlen stable at 32 for short queries for easier visualisation
+            maxlen = 32
+        maxlen = min(maxlen, self.base_model_max_tokens)
+        self.searcher.config.query_maxlen = maxlen
+        self.searcher.checkpoint.query_tokenizer.query_maxlen = maxlen
+
     def search(
         self,
         query: Union[str, list[str]],
@@ -476,8 +496,12 @@ class ColBERT(LateInteractionModel):
         self.searcher.configure(ndocs=max(k * 4, base_ndocs))
 
         if isinstance(query, str):
+            query_length = int(len(query.split(" ")) * 1.35)
+            self._upgrade_searcher_maxlen(query_length)
             results = [self._search(query, k, pids)]
         else:
+            longest_query_length = max([int(len(x.split(" ")) * 1.35) for x in query])
+            self._upgrade_searcher_maxlen(longest_query_length)
             results = self._batch_search(query, k)
 
         to_return = []
@@ -586,17 +610,17 @@ class ColBERT(LateInteractionModel):
             not hasattr(self, "inference_ckpt_len_set")
             or self.inference_ckpt_len_set is False
         ):
-            if max_tokens == "auto" or max_tokens > 512:
-                max_tokens = 512
+            if max_tokens == "auto" or max_tokens > self.base_model_max_tokens:
+                max_tokens = self.base_model_max_tokens
                 percentile_90 = np.percentile(
                     [len(x.split(" ")) for x in documents], 90
                 )
                 max_tokens = min(
                     math.floor((math.ceil((percentile_90 * 1.35) / 32) * 32) * 1.1),
-                    512,
+                    self.base_model_max_tokens,
                 )
                 max_tokens = max(256, max_tokens)
-                if max_tokens > 288:
+                if max_tokens > 300:
                     print(
                         f"Your documents are roughly {percentile_90} tokens long at the 90th percentile!",
                         "This is quite long and might slow down reranking!\n",
@@ -614,7 +638,7 @@ class ColBERT(LateInteractionModel):
         k: int,
         max_tokens: Union[Literal["auto"], int] = "auto",
         zero_index: bool = False,
-        bsize: int = 32,
+        bsize: Union[Literal["auto"], int] = "auto",
     ):
         self._set_inference_max_tokens(documents=documents, max_tokens=max_tokens)
 
@@ -647,10 +671,18 @@ class ColBERT(LateInteractionModel):
         )
 
     def _encode_index_free_queries(
-        self, queries: Union[str, list[str]], bsize: int = 32
+        self,
+        queries: Union[str, list[str]],
+        bsize: Union[Literal["auto"], int] = "auto",
     ):
+        if bsize == "auto":
+            bsize = 32
         if isinstance(queries, str):
             queries = [queries]
+        maxlen = max([int(len(x.split(" ")) * 1.35) for x in queries])
+        self.inference_ckpt.query_tokenizer.query_maxlen = max(
+            min(maxlen, self.base_model_max_tokens), 32
+        )
         embedded_queries = [
             x.unsqueeze(0)
             for x in self.inference_ckpt.queryFromText(queries, bsize=bsize)
@@ -658,12 +690,37 @@ class ColBERT(LateInteractionModel):
         return embedded_queries
 
     def _encode_index_free_documents(
-        self, documents: list[str], bsize: int = 32, verbose: bool = True
+        self,
+        documents: list[str],
+        bsize: Union[Literal["auto"], int] = "auto",
+        verbose: bool = True,
     ):
+        if bsize == "auto":
+            bsize = 32
+            if self.inference_ckpt.doc_tokenizer.doc_maxlen > 512:
+                bsize = max(
+                    1,
+                    int(
+                        32
+                        / (
+                            2
+                            ** round(
+                                math.log(
+                                    self.inference_ckpt.doc_tokenizer.doc_maxlen, 2
+                                )
+                            )
+                            / 512
+                        )
+                    ),
+                )
+                print("BSIZE:")
+                print(bsize)
         embedded_docs = self.inference_ckpt.docFromText(
             documents, bsize=bsize, showprogress=verbose
         )[0]
-        doc_mask = torch.full(embedded_docs.shape[:2], -float("inf"))
+        doc_mask = torch.full(embedded_docs.shape[:2], -float("inf")).to(
+            embedded_docs.device
+        )
         return embedded_docs, doc_mask
 
     def rank(
@@ -674,6 +731,8 @@ class ColBERT(LateInteractionModel):
         zero_index_ranks: bool = False,
         bsize: int = 32,
     ):
+        self._set_inference_max_tokens(documents=documents, max_tokens="auto")
+        self.inference_ckpt_len_set = False
         return self._index_free_retrieve(
             query, documents, k, zero_index=zero_index_ranks, bsize=bsize
         )
@@ -700,7 +759,7 @@ class ColBERT(LateInteractionModel):
                         - encodings.shape[1],
                         encodings.shape[2],
                     )
-                ),
+                ).to(device=encodings.device),
             ],
             dim=1,
         )
@@ -714,7 +773,7 @@ class ColBERT(LateInteractionModel):
                         - doc_masks.shape[1],
                     ),
                     -float("inf"),
-                ),
+                ).to(device=doc_masks.device),
             ],
             dim=1,
         )
