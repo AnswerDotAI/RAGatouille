@@ -191,8 +191,8 @@ class ColBERT(LateInteractionModel):
                 bsize=bsize,
             )
         else:
-            if self.config.index_bsize != bsize: # Update bsize if it's different
-                self.config.index_bsize = bsize            
+            if self.config.index_bsize != bsize:  # Update bsize if it's different
+                self.config.index_bsize = bsize
 
             updater = IndexUpdater(
                 config=self.config, searcher=searcher, checkpoint=self.checkpoint
@@ -757,7 +757,7 @@ class ColBERT(LateInteractionModel):
                         - encodings.shape[1],
                         encodings.shape[2],
                     )
-                ),
+                ).to(device=encodings.device),
             ],
             dim=1,
         )
@@ -771,7 +771,7 @@ class ColBERT(LateInteractionModel):
                         - doc_masks.shape[1],
                     ),
                     -float("inf"),
-                ),
+                ).to(device=encodings.device),
             ],
             dim=1,
         )
