@@ -218,37 +218,6 @@ def test_document_metadata_returned_in_search_results(
                 "metadata" not in result
             ), "The metadata should not be returned in the results."
 
-# TODO: move this to a separate test file
-def test_delete_from_index(
-    index_creation_inputs,
-    pid_docid_map_path_fixture,
-    document_metadata_path_fixture,
-    index_path_fixture,
-):
-    RAG = RAGPretrainedModel.from_index(index_path_fixture)
-    deleted_doc_id = index_creation_inputs["document_ids"][0]
-    original_doc_ids = set(index_creation_inputs["document_ids"])
-    RAG.delete_from_index(
-        index_name=index_creation_inputs["index_name"],
-        document_ids=[deleted_doc_id],
-    )
-    pid_docid_map_data = srsly.read_json(pid_docid_map_path_fixture)
-    updated_document_ids = set(list(pid_docid_map_data.values()))
-    assert (
-        deleted_doc_id not in updated_document_ids
-    ), "Deleted document ID should not be in the collection."
-    assert original_doc_ids - updated_document_ids == {
-        deleted_doc_id
-    }, "Only the deleted document ID should be missing from the collection."
-    if "document_metadatas" in index_creation_inputs:
-        document_metadata_dict = srsly.read_json(document_metadata_path_fixture)
-        assert (
-            deleted_doc_id not in document_metadata_dict
-        ), "Deleted document ID should not be in the document metadata."
-        assert original_doc_ids - set(document_metadata_dict.keys()) == {
-            deleted_doc_id
-        }, "Only the deleted document ID should be missing from the document metadata."
-
 
 # TODO: move this to a separate test file
 def test_add_to_index(
@@ -284,15 +253,51 @@ def test_add_to_index(
     for doc_id in new_doc_ids:
         assert (
             doc_id in document_ids
-        ), f"New document ID {doc_id} should be in the pid_docid_map."
+        ), f"New document ID '{doc_id}' should be in the pid_docid_map's document_ids:{document_ids}."
+        assert (
+            existing_doc_id in document_ids
+        ), f"Old document ID '{existing_doc_id}' should be in the pid_docid_map's document_ids:{document_ids}."
+        
+    if "document_metadatas" in index_creation_inputs:
         assert (
             doc_id in document_metadata_dict
-        ), f"New document ID {doc_id} should be in the document metadata."
+        ), f"New document ID '{doc_id}' should be in the document metadata keys:{document_metadata_dict.keys}."
+        assert (
+            existing_doc_id in document_metadata_dict
+        ), f"Old document ID '{existing_doc_id}' should be in the document metadata keys:{document_metadata_dict.keys}."
 
-    # check for old doc
+
+# TODO: move this to a separate test file
+def test_delete_from_index(
+    index_creation_inputs,
+    pid_docid_map_path_fixture,
+    document_metadata_path_fixture,
+    index_path_fixture,
+):
+    RAG = RAGPretrainedModel.from_index(index_path_fixture)
+    deleted_doc_id = index_creation_inputs["document_ids"][0]
+    original_doc_ids = set(index_creation_inputs["document_ids"])
+    RAG.delete_from_index(
+        index_name=index_creation_inputs["index_name"],
+        document_ids=[deleted_doc_id],
+    )
+    pid_docid_map_data = srsly.read_json(pid_docid_map_path_fixture)
+    updated_document_ids = set(list(pid_docid_map_data.values()))
+    
     assert (
-        existing_doc_id in document_ids
-    ), f"Old document ID {existing_doc_id} should be in the pid_docid_map."
+        deleted_doc_id not in updated_document_ids
+    ), f"Deleted document ID '{deleted_doc_id}' should not be in the pid_docid_map's document_ids: {updated_document_ids}."
+    
     assert (
-        existing_doc_id in document_metadata_dict
-    ), f"Old document ID {existing_doc_id} should be in the document metadata."
+        original_doc_ids - updated_document_ids == {deleted_doc_id}
+    ), f"Only the deleted document ID '{deleted_doc_id}' should be missing from the pid_docid_map's document_ids: {updated_document_ids}."
+
+
+    if "document_metadatas" in index_creation_inputs:
+        document_metadata_dict = srsly.read_json(document_metadata_path_fixture)
+        assert (
+            deleted_doc_id not in document_metadata_dict
+        ), f"Deleted document ID '{deleted_doc_id}' should not be in the document metadata: {document_metadata_dict.keys}."
+        assert (
+            original_doc_ids - set(document_metadata_dict.keys()) == {deleted_doc_id}
+        ), f"Only the deleted document ID '{deleted_doc_id}' should be missing from the document metadata: {document_metadata_dict.keys}."
