@@ -13,6 +13,7 @@ from colbert.infra import ColBERTConfig, Run, RunConfig
 from colbert.modeling.checkpoint import Checkpoint
 
 from ragatouille.models.base import LateInteractionModel
+from ragatouille.models.index import ModelIndex, ModelIndexFactory
 
 # TODO: Move all bsize related calcs to `_set_bsize()`
 
@@ -40,6 +41,7 @@ class ColBERT(LateInteractionModel):
 
         self.loaded_from_index = load_from_index
 
+        self.model_index: Optional[ModelIndex] = None
         if load_from_index:
             self.index_path = str(pretrained_model_name_or_path)
             ckpt_config = ColBERTConfig.load_from_index(
@@ -299,6 +301,20 @@ class ColBERT(LateInteractionModel):
 
         print(f"Successfully deleted documents with these IDs: {document_ids}")
 
+    def _save_index_metadata(self):
+        self._write_collection_to_file(
+            self.collection, self.index_path + "/collection.json"
+        )
+
+        self._write_collection_to_file(
+            self.pid_docid_map, self.index_path + "/pid_docid_map.json"
+        )
+
+        if self.docid_metadata_map is not None:
+            self._write_collection_to_file(
+                self.docid_metadata_map, self.index_path + "/docid_metadata_map.json"
+            )
+
     def index(
         self,
         collection: List[str],
@@ -309,21 +325,9 @@ class ColBERT(LateInteractionModel):
         overwrite: Union[bool, str] = "reuse",
         bsize: int = 32,
     ):
-        if torch.cuda.is_available():
-            import faiss
-
-            if not hasattr(faiss, "StandardGpuResources"):
-                print(
-                    "________________________________________________________________________________\n"
-                    "WARNING! You have a GPU available, but only `faiss-cpu` is currently installed.\n",
-                    "This means that indexing will be slow. To make use of your GPU.\n"
-                    "Please install `faiss-gpu` by running:\n"
-                    "pip uninstall --y faiss-cpu & pip install faiss-gpu\n",
-                    "________________________________________________________________________________",
-                )
-                print("Will continue with CPU indexing in 5 seconds...")
-                time.sleep(5)
+        self.collection = collection
         self.config.doc_maxlen = max_document_length
+
         if index_name is not None:
             if self.index_name is not None:
                 print(
@@ -339,36 +343,6 @@ class ColBERT(LateInteractionModel):
                 )
             self.index_name = self.checkpoint + "new_index"
 
-        self.collection = collection
-
-        nbits = 2
-        if len(self.collection) < 5000:
-            nbits = 8
-        elif len(self.collection) < 10000:
-            nbits = 4
-        self.config = ColBERTConfig.from_existing(
-            self.config, ColBERTConfig(nbits=nbits, index_bsize=bsize)
-        )
-
-        if len(self.collection) > 100000:
-            self.config.kmeans_niters = 4
-        elif len(self.collection) > 50000:
-            self.config.kmeans_niters = 10
-        else:
-            self.config.kmeans_niters = 20
-
-        # Instruct colbert-ai to disable forking if nranks == 1
-        self.config.avoid_fork_if_possible = True
-        self.indexer = Indexer(
-            checkpoint=self.checkpoint,
-            config=self.config,
-            verbose=self.verbose,
-        )
-        self.indexer.configure(avoid_fork_if_possible=True)
-        self.indexer.index(
-            name=self.index_name, collection=self.collection, overwrite=overwrite
-        )
-
         self.index_path = str(
             Path(self.run_config.root)
             / Path(self.run_config.experiment)
@@ -378,25 +352,43 @@ class ColBERT(LateInteractionModel):
         self.config.root = str(
             Path(self.run_config.root) / Path(self.run_config.experiment) / "indexes"
         )
-        self._write_collection_to_file(
-            self.collection, self.index_path + "/collection.json"
-        )
 
         self.pid_docid_map = pid_docid_map
-        self._write_collection_to_file(
-            self.pid_docid_map, self.index_path + "/pid_docid_map.json"
-        )
 
         # inverted mapping for returning full docs
         self.docid_pid_map = defaultdict(list)
         for pid, docid in self.pid_docid_map.items():
             self.docid_pid_map[docid].append(pid)
 
-        if docid_metadata_map is not None:
-            self._write_collection_to_file(
-                docid_metadata_map, self.index_path + "/docid_metadata_map.json"
-            )
-            self.docid_metadata_map = docid_metadata_map
+        self.docid_metadata_map = docid_metadata_map
+
+        if torch.cuda.is_available():
+            import faiss
+
+            if not hasattr(faiss, "StandardGpuResources"):
+                print(
+                    "________________________________________________________________________________\n"
+                    "WARNING! You have a GPU available, but only `faiss-cpu` is currently installed.\n",
+                    "This means that indexing will be slow. To make use of your GPU.\n"
+                    "Please install `faiss-gpu` by running:\n"
+                    "pip uninstall --y faiss-cpu & pip install faiss-gpu\n",
+                    "________________________________________________________________________________",
+                )
+                print("Will continue with CPU indexing in 5 seconds...")
+                time.sleep(5)
+
+        self.model_index = ModelIndexFactory.construct(
+            "PLAID",
+            self.config,
+            self.checkpoint,
+            self.collection,
+            self.index_name,
+            overwrite,
+            self.verbose,
+            bsize=bsize,
+        )
+        self.config = self.model_index.config
+        self._save_index_metadata()
 
         print("Done indexing!")
 
