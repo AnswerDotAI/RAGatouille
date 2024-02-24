@@ -138,7 +138,7 @@ class ColBERT(LateInteractionModel):
             "WARNING: add_to_index support is currently experimental!",
             "add_to_index support will be more thorough in future versions",
         )
-        
+
         if self.loaded_from_index:
             index_root = self.config.root
         else:
@@ -151,7 +151,9 @@ class ColBERT(LateInteractionModel):
             if not self.collection:
                 collection_path = Path(index_root) / self.index_name / "collection.json"
                 if collection_path.exists():
-                    self.collection = self._get_collection_from_file(str(collection_path))
+                    self.collection = self._get_collection_from_file(
+                        str(collection_path)
+                    )
 
         searcher = Searcher(
             checkpoint=self.checkpoint,
@@ -178,7 +180,9 @@ class ColBERT(LateInteractionModel):
         for idx, doc in enumerate(new_documents_with_ids, start=max_existing_pid + 1):
             self.pid_docid_map[idx] = doc["document_id"]
 
-        combined_documents = self.collection + [doc["content"] for doc in new_documents_with_ids]
+        combined_documents = self.collection + [
+            doc["content"] for doc in new_documents_with_ids
+        ]
 
         if current_len + new_doc_len < 5000 or new_doc_len > current_len * 0.05:
             self.index(
@@ -197,7 +201,7 @@ class ColBERT(LateInteractionModel):
             updater = IndexUpdater(
                 config=self.config, searcher=searcher, checkpoint=self.checkpoint
             )
-            
+
             updater.add([doc["content"] for doc in new_documents_with_ids])
             updater.persist_to_disk()
 

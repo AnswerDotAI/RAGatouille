@@ -257,7 +257,7 @@ def test_add_to_index(
         assert (
             existing_doc_id in document_ids
         ), f"Old document ID '{existing_doc_id}' should be in the pid_docid_map's document_ids:{document_ids}."
-        
+
     if "document_metadatas" in index_creation_inputs:
         assert (
             doc_id in document_metadata_dict
@@ -283,15 +283,14 @@ def test_delete_from_index(
     )
     pid_docid_map_data = srsly.read_json(pid_docid_map_path_fixture)
     updated_document_ids = set(list(pid_docid_map_data.values()))
-    
+
     assert (
         deleted_doc_id not in updated_document_ids
     ), f"Deleted document ID '{deleted_doc_id}' should not be in the pid_docid_map's document_ids: {updated_document_ids}."
-    
+
     assert (
         original_doc_ids - updated_document_ids == {deleted_doc_id}
     ), f"Only the deleted document ID '{deleted_doc_id}' should be missing from the pid_docid_map's document_ids: {updated_document_ids}."
-
 
     if "document_metadatas" in index_creation_inputs:
         document_metadata_dict = srsly.read_json(document_metadata_path_fixture)
