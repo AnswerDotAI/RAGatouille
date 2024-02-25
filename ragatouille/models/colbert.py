@@ -8,7 +8,7 @@ from typing import Dict, List, Literal, Optional, TypeVar, Union
 import numpy as np
 import srsly
 import torch
-from colbert import Indexer, IndexUpdater, Searcher, Trainer
+from colbert import IndexUpdater, Searcher, Trainer
 from colbert.infra import ColBERTConfig, Run, RunConfig
 from colbert.modeling.checkpoint import Checkpoint
 
@@ -34,7 +34,6 @@ class ColBERT(LateInteractionModel):
         self.collection = None
         self.pid_docid_map = None
         self.docid_metadata_map = None
-        self.in_memory_docs = []
         self.base_model_max_tokens = 512
         if n_gpu == -1:
             n_gpu = 1 if torch.cuda.device_count() == 0 else torch.cuda.device_count()
@@ -47,7 +46,11 @@ class ColBERT(LateInteractionModel):
             ckpt_config = ColBERTConfig.load_from_index(
                 str(pretrained_model_name_or_path)
             )
-            self.config = ckpt_config
+            # Use pretrained_model_name_or_path, and set the config for this.
+            self.model_index = ModelIndexFactory.load_from_file(
+                self.index_path, index_name, ckpt_config
+            )
+            self.config = self.model_index.config
             self.run_config = RunConfig(
                 nranks=n_gpu, experiment=self.config.experiment, root=self.config.root
             )
@@ -302,6 +305,18 @@ class ColBERT(LateInteractionModel):
         print(f"Successfully deleted documents with these IDs: {document_ids}")
 
     def _save_index_metadata(self):
+        assert self.model_index is not None
+
+        model_metadata = srsly.read_json(self.index_path + "/metadata.json")
+        index_config = self.model_index.export_metadata()
+        index_config["index_name"] = self.index_name
+        # Ensure that the additional metadata we store does not collide with anything else.
+        model_metadata["RAGatouille"] = {"index_config": index_config}  # type: ignore
+        self._write_collection_to_file(
+            model_metadata,
+            self.index_path + "/metadata.json",
+        )
+
         self._write_collection_to_file(
             self.collection, self.index_path + "/collection.json"
         )

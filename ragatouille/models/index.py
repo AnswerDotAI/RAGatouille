@@ -38,7 +38,13 @@ class ModelIndex(ABC):
 
     @staticmethod
     @abstractmethod
-    def load_from_file(pretrained_model_path: Path) -> "ModelIndex":
+    def load_from_file(
+        index_path: str,
+        index_name: Optional[str],
+        index_config: dict[str, Any],
+        config: ColBERTConfig,
+        verbose: bool = True,
+    ) -> "ModelIndex":
         ...
 
     @abstractmethod
@@ -62,8 +68,13 @@ class ModelIndex(ABC):
         ...
 
     @abstractmethod
-    def export(self) -> Optional[dict[str, Any]]:
+    def _export_config(self) -> dict[str, Any]:
         ...
+
+    def export_metadata(self) -> dict[str, Any]:
+        config = self._export_config()
+        config["index_type"] = self.index_type
+        return config
 
 
 class FLATModelIndex(ModelIndex):
@@ -136,8 +147,14 @@ class PLAIDModelIndex(ModelIndex):
         return PLAIDModelIndex(config)
 
     @staticmethod
-    def load_from_file(pretrained_model_path: Path) -> "PLAIDModelIndex":
-        raise NotImplementedError()
+    def load_from_file(
+        index_path: str,
+        index_name: Optional[str],
+        index_config: dict[str, Any],
+        config: ColBERTConfig,
+        verbose: bool = True,
+    ) -> "PLAIDModelIndex":
+        return PLAIDModelIndex(config)
 
     def build(self) -> None:
         raise NotImplementedError()
@@ -154,8 +171,8 @@ class PLAIDModelIndex(ModelIndex):
     def delete(self) -> None:
         raise NotImplementedError()
 
-    def export(self) -> Optional[dict[str, Any]]:
-        raise NotImplementedError()
+    def _export_config(self) -> dict[str, Any]:
+        return {}
 
 
 class ModelIndexFactory:
@@ -195,19 +212,27 @@ class ModelIndexFactory:
         )
 
     @staticmethod
-    def _file_index_type(pretrained_model_path: Path) -> IndexType:
+    def load_from_file(
+        index_path: str,
+        index_name: Optional[str],
+        config: ColBERTConfig,
+        verbose: bool = True,
+    ) -> ModelIndex:
+        metadata = srsly.read_json(index_path + "/metadata.json")
         try:
-            index_type = srsly.read_json(str(pretrained_model_path / "metadata.json"))[
-                "index_type"
-            ]
-            assert isinstance(index_type, str)
+            index_config = metadata["RAGatouille"]["index_config"]  # type: ignore
         except KeyError:
-            index_type = "PLAID"
-        return ModelIndexFactory._raise_if_invalid_index_type(index_type)
-
-    @staticmethod
-    def load_from_file(pretrained_model_path: Path) -> ModelIndex:
-        index_type = ModelIndexFactory._file_index_type(pretrained_model_path)
-        return ModelIndexFactory._MODEL_INDEX_BY_NAME[index_type].load_from_file(
-            pretrained_model_path
+            if verbose:
+                print(
+                    f"Constructing default index configuration for index `{index_name}` as it does not contain RAGatouille specific metadata."
+                )
+            index_config = {
+                "index_type": "PLAID",
+                "index_name": index_name,
+            }
+        index_name = (
+            index_name if index_name is not None else index_config["index_name"]  # type: ignore
         )
+        return ModelIndexFactory._MODEL_INDEX_BY_NAME[
+            ModelIndexFactory._raise_if_invalid_index_type(index_config["index_type"])  # type: ignore
+        ].load_from_file(index_path, index_name, index_config, config, verbose)
