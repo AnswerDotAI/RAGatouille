@@ -3,7 +3,7 @@ from pathlib import Path
 from time import time
 from typing import Any, List, Literal, Optional, TypeAlias, Union
 
-from colbert import Indexer
+from colbert import IndexUpdater, Indexer, Searcher
 from colbert.infra import ColBERTConfig
 
 import torch
@@ -60,7 +60,19 @@ class ModelIndex(ABC):
         ...
 
     @abstractmethod
-    def add(self) -> None:
+    def add(
+        self,
+        config: ColBERTConfig,
+        checkpoint: Union[str, Path],
+        collection: List[str],
+        pid_docid_map,
+        index_root: str,
+        index_name: str,
+        new_documents: List[str],
+        new_pid_docid_map: dict[int, str],
+        verbose: bool = True,
+        **kwargs,
+    ) -> list[dict[str, str]]:
         ...
 
     @abstractmethod
@@ -86,6 +98,7 @@ class HNSWModelIndex(ModelIndex):
 
 
 class PLAIDModelIndex(ModelIndex):
+    _DEFAULT_INDEX_BSIZE = 32
     index_type = "PLAID"
 
     def __init__(self, config: ColBERTConfig) -> None:
@@ -101,7 +114,30 @@ class PLAIDModelIndex(ModelIndex):
         verbose: bool = True,
         **kwargs,
     ) -> "PLAIDModelIndex":
-        bsize = kwargs.get("bsize", 32)
+        return PLAIDModelIndex(config).build(
+            checkpoint, collection, index_name, overwrite, verbose, **kwargs
+        )
+
+    @staticmethod
+    def load_from_file(
+        index_path: str,
+        index_name: Optional[str],
+        index_config: dict[str, Any],
+        config: ColBERTConfig,
+        verbose: bool = True,
+    ) -> "PLAIDModelIndex":
+        return PLAIDModelIndex(config)
+
+    def build(
+        self,
+        checkpoint: Union[str, Path],
+        collection: List[str],
+        index_name: Optional["str"] = None,
+        overwrite: Union[bool, str] = "reuse",
+        verbose: bool = True,
+        **kwargs,
+    ) -> "PLAIDModelIndex":
+        bsize = kwargs.get("bsize", PLAIDModelIndex._DEFAULT_INDEX_BSIZE)
         assert isinstance(bsize, int)
 
         if torch.cuda.is_available():
@@ -124,40 +160,27 @@ class PLAIDModelIndex(ModelIndex):
             nbits = 8
         elif len(collection) < 10000:
             nbits = 4
-        config = ColBERTConfig.from_existing(
-            config, ColBERTConfig(nbits=nbits, index_bsize=bsize)
+        self.config = ColBERTConfig.from_existing(
+            self.config, ColBERTConfig(nbits=nbits, index_bsize=bsize)
         )
 
         if len(collection) > 100000:
-            config.kmeans_niters = 4
+            self.config.kmeans_niters = 4
         elif len(collection) > 50000:
-            config.kmeans_niters = 10
+            self.config.kmeans_niters = 10
         else:
-            config.kmeans_niters = 20
+            self.config.kmeans_niters = 20
 
         # Instruct colbert-ai to disable forking if nranks == 1
-        config.avoid_fork_if_possible = True
+        self.config.avoid_fork_if_possible = True
         indexer = Indexer(
             checkpoint=checkpoint,
-            config=config,
+            config=self.config,
             verbose=verbose,
         )
         indexer.configure(avoid_fork_if_possible=True)
         indexer.index(name=index_name, collection=collection, overwrite=overwrite)
-        return PLAIDModelIndex(config)
-
-    @staticmethod
-    def load_from_file(
-        index_path: str,
-        index_name: Optional[str],
-        index_config: dict[str, Any],
-        config: ColBERTConfig,
-        verbose: bool = True,
-    ) -> "PLAIDModelIndex":
-        return PLAIDModelIndex(config)
-
-    def build(self) -> None:
-        raise NotImplementedError()
+        return self
 
     def search(self) -> None:
         raise NotImplementedError()
@@ -165,8 +188,68 @@ class PLAIDModelIndex(ModelIndex):
     def batch_search(self) -> None:
         raise NotImplementedError()
 
-    def add(self) -> None:
-        raise NotImplementedError()
+    @staticmethod
+    def _should_rebuild(current_len: int, new_doc_len: int) -> bool:
+        """
+        Heuristic to determine if it is more efficient to rebuild the index instead of updating it.
+        """
+        return current_len + new_doc_len < 5000 or new_doc_len > current_len * 0.05
+
+    def add(
+        self,
+        config: ColBERTConfig,
+        checkpoint: Union[str, Path],
+        collection: List[str],
+        pid_docid_map,
+        index_root: str,
+        index_name: str,
+        new_documents: List[str],
+        new_pid_docid_map: dict[int, str],
+        verbose: bool = True,
+        **kwargs,
+    ) -> list[dict[str, str]]:
+        self.config = config
+
+        bsize = kwargs.get("bsize", PLAIDModelIndex._DEFAULT_INDEX_BSIZE)
+        assert isinstance(bsize, int)
+
+        searcher = Searcher(
+            checkpoint=checkpoint,
+            config=None,
+            collection=collection,
+            index=index_name,
+            index_root=index_root,
+            verbose=verbose,
+        )
+        new_documents_with_ids = [
+            {"content": doc, "document_id": new_pid_docid_map[pid]}
+            for pid, doc in enumerate(new_documents)
+            if new_pid_docid_map[pid] not in pid_docid_map
+        ]
+        if PLAIDModelIndex._should_rebuild(
+            len(searcher.collection), len(new_documents)
+        ):
+            # TODO Double check: The behavior is quite a bit different then before.
+            self.build(
+                checkpoint=checkpoint,
+                collection=collection
+                + [doc["content"] for doc in new_documents_with_ids],
+                index_name=index_name,
+                overwrite="force_silent_overwrite",
+                verbose=verbose,
+                **kwargs,
+            )
+        else:
+            if self.config.index_bsize != bsize:  # Update bsize if it's different
+                self.config.index_bsize = bsize
+
+            updater = IndexUpdater(
+                config=self.config, searcher=searcher, checkpoint=checkpoint
+            )
+            updater.add([doc["content"] for doc in new_documents_with_ids])
+            updater.persist_to_disk()
+
+        return new_documents_with_ids
 
     def delete(self) -> None:
         raise NotImplementedError()

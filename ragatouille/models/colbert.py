@@ -46,7 +46,6 @@ class ColBERT(LateInteractionModel):
             ckpt_config = ColBERTConfig.load_from_index(
                 str(pretrained_model_name_or_path)
             )
-            # Use pretrained_model_name_or_path, and set the config for this.
             self.model_index = ModelIndexFactory.load_from_file(
                 self.index_path, index_name, ckpt_config
             )
@@ -161,49 +160,29 @@ class ColBERT(LateInteractionModel):
                     )
                 )
 
-        searcher = Searcher(
-            checkpoint=self.checkpoint,
-            config=None,
-            collection=self.collection,
-            index=self.index_name,
-            index_root=index_root,
-            verbose=self.verbose,
+        # TODO We may want to load an existing index here instead;
+        #      For now require that either index() was called, or an existing one was loaded.
+        assert self.model_index is not None
+
+        # TODO We probably want to store some of this in the model_index directly.
+        new_documents_with_ids = self.model_index.add(
+            self.config,
+            self.checkpoint,
+            self.collection,
+            self.pid_docid_map,
+            index_root,
+            self.index_name,
+            new_documents,
+            new_pid_docid_map,
+            self.verbose != 0,
+            bsize=bsize,
         )
+        self.config = self.model_index.config
 
-        current_len = len(searcher.collection)
-        new_doc_len = len(new_documents)
-        new_documents_with_ids = [
-            {"content": doc, "document_id": new_pid_docid_map[pid]}
-            for pid, doc in enumerate(new_documents)
-            if new_pid_docid_map[pid] not in self.pid_docid_map
-        ]
-
+        # TODO This has inconsistent behavior for duplicates.
         if new_docid_metadata_map is not None:
             self.docid_metadata_map = self.docid_metadata_map or {}
             self.docid_metadata_map.update(new_docid_metadata_map)
-
-        if current_len + new_doc_len < 5000 or new_doc_len > current_len * 0.05:
-            self.index(
-                [doc["content"] for doc in new_documents_with_ids],
-                {
-                    pid: doc["document_id"]
-                    for pid, doc in enumerate(new_documents_with_ids)
-                },
-                docid_metadata_map=self.docid_metadata_map,
-                index_name=self.index_name,
-                max_document_length=self.config.doc_maxlen,
-                overwrite="force_silent_overwrite",
-                bsize=bsize,
-            )
-        else:
-            if self.config.index_bsize != bsize:  # Update bsize if it's different
-                self.config.index_bsize = bsize
-
-            updater = IndexUpdater(
-                config=self.config, searcher=searcher, checkpoint=self.checkpoint
-            )
-            updater.add([doc["content"] for doc in new_documents_with_ids])
-            updater.persist_to_disk()
 
         self.pid_docid_map.update(
             {pid: doc["document_id"] for pid, doc in enumerate(new_documents_with_ids)}
@@ -212,19 +191,14 @@ class ColBERT(LateInteractionModel):
         for pid, docid in self.pid_docid_map.items():
             self.docid_pid_map[docid].append(pid)
 
-        self._write_collection_to_file(
-            self.pid_docid_map, self.index_path + "/pid_docid_map.json"
-        )
-        if self.docid_metadata_map is not None:
-            self._write_collection_to_file(
-                self.docid_metadata_map, self.index_path + "/docid_metadata_map.json"
-            )
+        self._save_index_metadata()
 
         print(
             f"Successfully updated index with {len(new_documents_with_ids)} new documents!\n",
-            f"New index size: {current_len + len(new_documents_with_ids)}",
+            f"New index size: {len(self.collection) + len(new_documents_with_ids)}",  # type: ignore
         )
 
+        # TODO: Double check: seems to implicitly change the index_path in case loaded_from_index
         self.index_path = str(
             Path(self.run_config.root)
             / Path(self.run_config.experiment)
@@ -291,16 +265,7 @@ class ColBERT(LateInteractionModel):
                 if docid not in document_ids
             }
 
-        self._write_collection_to_file(
-            self.collection, self.index_path + "/collection.json"
-        )
-        self._write_collection_to_file(
-            self.pid_docid_map, self.index_path + "/pid_docid_map.json"
-        )
-        if self.docid_metadata_map is not None:
-            self._write_collection_to_file(
-                self.docid_metadata_map, self.index_path + "/docid_metadata_map.json"
-            )
+        self._save_index_metadata()
 
         print(f"Successfully deleted documents with these IDs: {document_ids}")
 
