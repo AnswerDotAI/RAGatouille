@@ -224,16 +224,23 @@ class PLAIDModelIndex(ModelIndex):
         new_documents_with_ids = [
             {"content": doc, "document_id": new_pid_docid_map[pid]}
             for pid, doc in enumerate(new_documents)
-            if new_pid_docid_map[pid] not in pid_docid_map
+            if new_pid_docid_map[pid] not in pid_docid_map.values()
         ]
+
+        max_existing_pid = max(pid_docid_map.keys(), default=-1)
+        for idx, doc in enumerate(new_documents_with_ids, start=max_existing_pid + 1):
+            pid_docid_map[idx] = doc["document_id"]
+
+        combined_documents = collection + [
+            doc["content"] for doc in new_documents_with_ids
+        ]
+
         if PLAIDModelIndex._should_rebuild(
             len(searcher.collection), len(new_documents)
         ):
-            # TODO Double check: The behavior is quite a bit different then before.
             self.build(
                 checkpoint=checkpoint,
-                collection=collection
-                + [doc["content"] for doc in new_documents_with_ids],
+                collection=combined_documents,
                 index_name=index_name,
                 overwrite="force_silent_overwrite",
                 verbose=verbose,

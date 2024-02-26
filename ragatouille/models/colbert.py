@@ -146,19 +146,22 @@ class ColBERT(LateInteractionModel):
         if self.loaded_from_index:
             index_root = self.config.root
         else:
+            expected_path_segment = Path(self.config.experiment) / "indexes"
+            if str(expected_path_segment) in self.config.root:
+                index_root = self.config.root
+            else:
+                index_root = str(Path(self.config.root) / expected_path_segment)
             index_root = str(
                 Path(self.config.root) / Path(self.config.experiment) / "indexes"
             )
             if not self.collection:
-                self.collection = self._get_collection_from_file(
-                    str(
-                        Path(self.config.root)
-                        / Path(self.config.experiment)
-                        / "indexes"
-                        / self.index_name
-                        / "collection.json"
+                collection_path = Path(index_root) / self.index_name / "collection.json"
+                if collection_path.exists():
+                    self.collection = self._get_collection_from_file(
+                        str(collection_path)
                     )
-                )
+                else:
+                    self.collection = []
 
         # TODO We may want to load an existing index here instead;
         #      For now require that either index() was called, or an existing one was loaded.
@@ -184,9 +187,6 @@ class ColBERT(LateInteractionModel):
             self.docid_metadata_map = self.docid_metadata_map or {}
             self.docid_metadata_map.update(new_docid_metadata_map)
 
-        self.pid_docid_map.update(
-            {pid: doc["document_id"] for pid, doc in enumerate(new_documents_with_ids)}
-        )
         self.docid_pid_map = defaultdict(list)
         for pid, docid in self.pid_docid_map.items():
             self.docid_pid_map[docid].append(pid)
