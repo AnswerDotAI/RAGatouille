@@ -65,14 +65,12 @@ class ModelIndex(ABC):
         config: ColBERTConfig,
         checkpoint: Union[str, Path],
         collection: List[str],
-        pid_docid_map,
         index_root: str,
         index_name: str,
-        new_documents: List[str],
-        new_pid_docid_map: dict[int, str],
+        new_collection: List[str],
         verbose: bool = True,
         **kwargs,
-    ) -> list[dict[str, str]]:
+    ) -> None:
         ...
 
     @abstractmethod
@@ -200,14 +198,12 @@ class PLAIDModelIndex(ModelIndex):
         config: ColBERTConfig,
         checkpoint: Union[str, Path],
         collection: List[str],
-        pid_docid_map,
         index_root: str,
         index_name: str,
-        new_documents: List[str],
-        new_pid_docid_map: dict[int, str],
+        new_collection: List[str],
         verbose: bool = True,
         **kwargs,
-    ) -> list[dict[str, str]]:
+    ) -> None:
         self.config = config
 
         bsize = kwargs.get("bsize", PLAIDModelIndex._DEFAULT_INDEX_BSIZE)
@@ -221,26 +217,13 @@ class PLAIDModelIndex(ModelIndex):
             index_root=index_root,
             verbose=verbose,
         )
-        new_documents_with_ids = [
-            {"content": doc, "document_id": new_pid_docid_map[pid]}
-            for pid, doc in enumerate(new_documents)
-            if new_pid_docid_map[pid] not in pid_docid_map.values()
-        ]
-
-        max_existing_pid = max(pid_docid_map.keys(), default=-1)
-        for idx, doc in enumerate(new_documents_with_ids, start=max_existing_pid + 1):
-            pid_docid_map[idx] = doc["document_id"]
-
-        combined_documents = collection + [
-            doc["content"] for doc in new_documents_with_ids
-        ]
 
         if PLAIDModelIndex._should_rebuild(
-            len(searcher.collection), len(new_documents)
+            len(searcher.collection), len(new_collection)
         ):
             self.build(
                 checkpoint=checkpoint,
-                collection=combined_documents,
+                collection=collection + new_collection,
                 index_name=index_name,
                 overwrite="force_silent_overwrite",
                 verbose=verbose,
@@ -253,10 +236,8 @@ class PLAIDModelIndex(ModelIndex):
             updater = IndexUpdater(
                 config=self.config, searcher=searcher, checkpoint=checkpoint
             )
-            updater.add([doc["content"] for doc in new_documents_with_ids])
+            updater.add(new_collection)
             updater.persist_to_disk()
-
-        return new_documents_with_ids
 
     def delete(self) -> None:
         raise NotImplementedError()

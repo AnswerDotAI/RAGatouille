@@ -163,24 +163,37 @@ class ColBERT(LateInteractionModel):
                 else:
                     self.collection = []
 
+        new_documents_with_ids = [
+            {"content": doc, "document_id": new_pid_docid_map[pid]}
+            for pid, doc in enumerate(new_documents)
+            if new_pid_docid_map[pid] not in self.pid_docid_map.values()
+        ]
+
+        max_existing_pid = max(self.pid_docid_map.keys(), default=-1)
+        for idx, doc in enumerate(new_documents_with_ids, start=max_existing_pid + 1):
+            self.pid_docid_map[idx] = doc["document_id"]
+
+        new_collection = [doc["content"] for doc in new_documents_with_ids]
+
         # TODO We may want to load an existing index here instead;
         #      For now require that either index() was called, or an existing one was loaded.
         assert self.model_index is not None
 
         # TODO We probably want to store some of this in the model_index directly.
-        new_documents_with_ids = self.model_index.add(
+        self.model_index.add(
             self.config,
             self.checkpoint,
             self.collection,
-            self.pid_docid_map,
             index_root,
             self.index_name,
-            new_documents,
-            new_pid_docid_map,
+            new_collection,
             self.verbose != 0,
             bsize=bsize,
         )
         self.config = self.model_index.config
+
+        # Update and serialize the index metadata + collection.
+        self.collection = self.collection + new_collection
 
         # TODO This has inconsistent behavior for duplicates.
         if new_docid_metadata_map is not None:
@@ -195,7 +208,7 @@ class ColBERT(LateInteractionModel):
 
         print(
             f"Successfully updated index with {len(new_documents_with_ids)} new documents!\n",
-            f"New index size: {len(self.collection) + len(new_documents_with_ids)}",  # type: ignore
+            f"New index size: {len(self.collection)}",
         )
 
         # TODO: Double check: seems to implicitly change the index_path in case loaded_from_index
