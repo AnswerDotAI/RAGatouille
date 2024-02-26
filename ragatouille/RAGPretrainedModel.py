@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Callable, List, Literal, Optional, TypeVar, Union
+from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, TypeVar, Union
 from uuid import uuid4
 
 from langchain.retrievers.document_compressors.base import BaseDocumentCompressor
@@ -126,43 +126,28 @@ class RAGPretrainedModel:
 
         return document_ids, docid_metadata_map
 
-    def index(
+    def _process_corpus(
         self,
-        collection: list[str],
-        document_ids: Union[TypeVar("T"), List[TypeVar("T")]] = None,
-        document_metadatas: Optional[list[dict]] = None,
-        index_name: str = None,
-        overwrite_index: Union[bool, str] = True,
-        max_document_length: int = 256,
-        split_documents: bool = True,
-        document_splitter_fn: Optional[Callable] = llama_index_sentence_splitter,
-        preprocessing_fn: Optional[Union[Callable, list[Callable]]] = None,
-    ):
-        """Build an index from a list of documents.
-
-        Parameters:
-            collection (list[str]): The collection of documents to index.
-            document_ids (Optional[list[str]]): An optional list of document ids. Ids will be generated at index time if not supplied.
-            index_name (str): The name of the index that will be built.
-            overwrite_index (Union[bool, str]): Whether to overwrite an existing index with the same name.
-            max_document_length (int): The maximum length of a document. Documents longer than this will be split into chunks.
-            split_documents (bool): Whether to split documents into chunks.
-            document_splitter_fn (Optional[Callable]): A function to split documents into chunks. If None and by default, will use the llama_index_sentence_splitter.
-            preprocessing_fn (Optional[Union[Callable, list[Callable]]]): A function or list of functions to preprocess documents. If None and by default, will not preprocess documents.
-
-        Returns:
-            index (str): The path to the index that was built.
+        collection: List[str],
+        document_ids: List[str],
+        document_metadatas: List[Dict[Any, Any]],
+        document_splitter_fn: Optional[Callable[[str], List[str]]],
+        preprocessing_fn: Optional[Callable[[str], str]],
+        max_document_length: int,
+    ) -> Tuple[List[str], Dict[int, str], Dict[str, Dict[Any, Any]]]:
         """
-
+        Processes a collection of documents by assigning unique IDs, splitting documents if necessary,
+        applying preprocessing, and organizing metadata.
+        """
         document_ids, docid_metadata_map = self._process_metadata(
             document_ids=document_ids,
             document_metadatas=document_metadatas,
             collection_len=len(collection),
         )
 
-        if split_documents or preprocessing_fn is not None:
+        if document_splitter_fn is not None or preprocessing_fn is not None:
             self.corpus_processor = CorpusProcessor(
-                document_splitter_fn=document_splitter_fn if split_documents else None,
+                document_splitter_fn=document_splitter_fn,
                 preprocessing_fn=preprocessing_fn,
             )
             collection_with_ids = self.corpus_processor.process_corpus(
@@ -180,6 +165,48 @@ class RAGPretrainedModel:
             index: item["document_id"] for index, item in enumerate(collection_with_ids)
         }
         collection = [x["content"] for x in collection_with_ids]
+
+        return collection, pid_docid_map, docid_metadata_map
+
+    def index(
+        self,
+        collection: list[str],
+        document_ids: Union[TypeVar("T"), List[TypeVar("T")]] = None,
+        document_metadatas: Optional[list[dict]] = None,
+        index_name: str = None,
+        overwrite_index: Union[bool, str] = True,
+        max_document_length: int = 256,
+        split_documents: bool = True,
+        document_splitter_fn: Optional[Callable] = llama_index_sentence_splitter,
+        preprocessing_fn: Optional[Union[Callable, list[Callable]]] = None,
+        bsize: int = 32,
+    ):
+        """Build an index from a list of documents.
+
+        Parameters:
+            collection (list[str]): The collection of documents to index.
+            document_ids (Optional[list[str]]): An optional list of document ids. Ids will be generated at index time if not supplied.
+            index_name (str): The name of the index that will be built.
+            overwrite_index (Union[bool, str]): Whether to overwrite an existing index with the same name.
+            max_document_length (int): The maximum length of a document. Documents longer than this will be split into chunks.
+            split_documents (bool): Whether to split documents into chunks.
+            document_splitter_fn (Optional[Callable]): A function to split documents into chunks. If None and by default, will use the llama_index_sentence_splitter.
+            preprocessing_fn (Optional[Union[Callable, list[Callable]]]): A function or list of functions to preprocess documents. If None and by default, will not preprocess documents.
+            bsize (int): The batch size to use for encoding the passages.
+
+        Returns:
+            index (str): The path to the index that was built.
+        """
+        if not split_documents:
+            document_splitter_fn = None
+        collection, pid_docid_map, docid_metadata_map = self._process_corpus(
+            collection,
+            document_ids,
+            document_metadatas,
+            document_splitter_fn,
+            preprocessing_fn,
+            max_document_length,
+        )
         return self.model.index(
             collection,
             pid_docid_map=pid_docid_map,
@@ -187,6 +214,7 @@ class RAGPretrainedModel:
             index_name=index_name,
             max_document_length=max_document_length,
             overwrite=overwrite_index,
+            bsize=bsize,
         )
 
     def add_to_index(
@@ -198,6 +226,7 @@ class RAGPretrainedModel:
         split_documents: bool = True,
         document_splitter_fn: Optional[Callable] = llama_index_sentence_splitter,
         preprocessing_fn: Optional[Union[Callable, list[Callable]]] = None,
+        bsize: int = 32,
     ):
         """Add documents to an existing index.
 
@@ -205,41 +234,30 @@ class RAGPretrainedModel:
             new_collection (list[str]): The documents to add to the index.
             new_document_metadatas (Optional[list[dict]]): An optional list of metadata dicts
             index_name (Optional[str]): The name of the index to add documents to. If None and by default, will add documents to the already initialised one.
+            bsize (int): The batch size to use for encoding the passages.
         """
-        new_document_ids, new_docid_metadata_map = self._process_metadata(
-            document_ids=new_document_ids,
-            document_metadatas=new_document_metadatas,
-            collection_len=len(new_collection),
+        if not split_documents:
+            document_splitter_fn = None
+
+        (
+            new_collection,
+            new_pid_docid_map,
+            new_docid_metadata_map,
+        ) = self._process_corpus(
+            new_collection,
+            new_document_ids,
+            new_document_metadatas,
+            document_splitter_fn,
+            preprocessing_fn,
+            self.model.config.doc_maxlen,
         )
-
-        if split_documents or preprocessing_fn is not None:
-            self.corpus_processor = CorpusProcessor(
-                document_splitter_fn=document_splitter_fn if split_documents else None,
-                preprocessing_fn=preprocessing_fn,
-            )
-            new_collection_with_ids = self.corpus_processor.process_corpus(
-                new_collection,
-                new_document_ids,
-                chunk_size=self.model.config.doc_maxlen,
-            )
-        else:
-            new_collection_with_ids = [
-                {"document_id": x, "content": y}
-                for x, y in zip(new_document_ids, new_collection)
-            ]
-
-        new_collection = [x["content"] for x in new_collection_with_ids]
-
-        new_pid_docid_map = {
-            index: item["document_id"]
-            for index, item in enumerate(new_collection_with_ids)
-        }
 
         self.model.add_to_index(
             new_collection,
             new_pid_docid_map,
             new_docid_metadata_map=new_docid_metadata_map,
             index_name=index_name,
+            bsize=bsize,
         )
 
     def delete_from_index(

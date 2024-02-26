@@ -1,4 +1,4 @@
-from typing import Callable, Optional, Union
+from typing import Callable, List, Optional, Union
 from uuid import uuid4
 
 from ragatouille.data.preprocessors import llama_index_sentence_splitter
@@ -18,7 +18,7 @@ class CorpusProcessor:
         documents: list[str],
         document_ids: Optional[list[str]] = None,
         **splitter_kwargs,
-    ) -> list[str]:
+    ) -> List[dict]:
         # TODO CHECK KWARGS
         document_ids = (
             [str(uuid4()) for _ in range(len(documents))]
