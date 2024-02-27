@@ -155,6 +155,22 @@ class RAGTrainer:
             mine_hard_negatives=mine_hard_negatives,
             hard_negative_minimum_rank=hard_negative_minimum_rank,
         )
+        if len(self.data_processor.training_triplets) == 0:
+            if mine_hard_negatives:
+                print("Warning: No training triplets were generated with setting mine_hard_negatives=='True'. This may be due to the data being too small or the hard negative miner not being able to find enough hard negatives.")
+                self.data_processor.process_raw_data(
+                    data_type=data_type,
+                    raw_data=raw_data,
+                    export=True,
+                    data_dir=data_out_path,
+                    num_new_negatives=num_new_negatives,
+                    positive_label=positive_label,
+                    negative_label=negative_label,
+                    mine_hard_negatives=False,
+                    hard_negative_minimum_rank=hard_negative_minimum_rank,
+                )
+            else:
+                raise ValueError("No training triplets were generated.")
 
         self.training_triplets = self.data_processor.training_triplets
 
