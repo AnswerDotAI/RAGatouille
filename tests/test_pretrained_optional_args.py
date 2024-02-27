@@ -218,10 +218,11 @@ def test_document_metadata_returned_in_search_results(
                 "metadata" not in result
             ), "The metadata should not be returned in the results."
 
+
 # TODO: move this to separate CRUD test file
 @pytest.mark.skip(reason="NotImplemented")
 def test_add_to_empty_index():
-    pass    
+    pass
 
 
 # TODO: move this to a separate CRUD test file
@@ -267,8 +268,8 @@ def test_add_to_existing_index(
         assert (
             existing_doc_id in document_ids
         ), f"Old document ID '{existing_doc_id}' should be in the pid_docid_map's document_ids:{document_ids}."
-        
-        if "document_metadatas" in index_creation_inputs:    
+
+        if "document_metadatas" in index_creation_inputs:
             assert (
                 existing_doc_id in document_metadata_dict
             ), f"Old document ID '{existing_doc_id}' should be in the document metadata keys:{document_metadata_dict.keys}."
