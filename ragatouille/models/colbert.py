@@ -187,7 +187,7 @@ class ColBERT(LateInteractionModel):
             index_root,
             self.index_name,
             new_collection,
-            self.verbose != 0,
+            verbose=self.verbose != 0,
             bsize=bsize,
         )
         self.config = self.model_index.config
@@ -362,7 +362,7 @@ class ColBERT(LateInteractionModel):
             self.collection,
             self.index_name,
             overwrite,
-            self.verbose,
+            verbose=self.verbose != 0,
             bsize=bsize,
         )
         self.config = self.model_index.config
@@ -372,11 +372,22 @@ class ColBERT(LateInteractionModel):
 
         return self.index_path
 
-    def _load_searcher(
+    def search(
         self,
-        index_name: Optional[str],
+        query: Union[str, list[str]],
+        index_name: Optional["str"] = None,
+        k: int = 10,
         force_fast: bool = False,
+        zero_index_ranks: bool = False,
+        doc_ids: Optional[List[str]] = None,
     ):
+        pids = None
+        if doc_ids is not None:
+            pids = []
+            for doc_id in doc_ids:
+                pids.extend(self.docid_pid_map[doc_id])
+
+        force_reload = self.index_name is not None and index_name != self.index_name
         if index_name is not None:
             if self.index_name is not None:
                 print(
@@ -391,91 +402,25 @@ class ColBERT(LateInteractionModel):
                     "Returning empty results.",
                 )
                 return None
-        print(
-            f"Loading searcher for index {self.index_name} for the first time...",
-            "This may take a few seconds",
+
+        # TODO We may want to load an existing index here instead;
+        #      For now require that either index() was called, or an existing one was loaded.
+        assert self.model_index is not None
+
+        results = self.model_index.search(
+            self.config,
+            self.checkpoint,
+            self.collection,
+            self.index_name,
+            self.base_model_max_tokens,
+            query,
+            k,
+            pids,
+            force_reload,
+            force_fast=force_fast,
         )
-        self.searcher = Searcher(
-            checkpoint=self.checkpoint,
-            config=None,
-            collection=self.collection,
-            index_root=self.config.root,
-            index=self.index_name,
-        )
-
-        if not force_fast:
-            self.searcher.configure(ndocs=1024)
-            self.searcher.configure(ncells=16)
-            if len(self.searcher.collection) < 10000:
-                self.searcher.configure(ncells=8)
-                self.searcher.configure(centroid_score_threshold=0.4)
-            elif len(self.searcher.collection) < 100000:
-                self.searcher.configure(ncells=4)
-                self.searcher.configure(centroid_score_threshold=0.45)
-            # Otherwise, use defaults for k
-        else:
-            # Use fast settingss
-            self.searcher.configure(ncells=1)
-            self.searcher.configure(centroid_score_threshold=0.5)
-            self.searcher.configure(ndocs=256)
-
-        print("Searcher loaded!")
-
-    def _upgrade_searcher_maxlen(self, maxlen: int):
-        if maxlen < 32:
-            # Keep maxlen stable at 32 for short queries for easier visualisation
-            maxlen = 32
-        maxlen = min(maxlen, self.base_model_max_tokens)
-        self.searcher.config.query_maxlen = maxlen
-        self.searcher.checkpoint.query_tokenizer.query_maxlen = maxlen
-
-    def search(
-        self,
-        query: Union[str, list[str]],
-        index_name: Optional["str"] = None,
-        k: int = 10,
-        force_fast: bool = False,
-        zero_index_ranks: bool = False,
-        doc_ids: Optional[List[str]] = None,
-    ):
-        if self.searcher is None or (
-            index_name is not None and self.index_name != index_name
-        ):
-            self._load_searcher(index_name=index_name, force_fast=force_fast)
-
-        pids = None
-        if doc_ids is not None:
-            pids = []
-            for doc_id in doc_ids:
-                pids.extend(self.docid_pid_map[doc_id])
-
-        base_ncells = self.searcher.config.ncells
-        base_ndocs = self.searcher.config.ndocs
-
-        if k > len(self.searcher.collection):
-            print(
-                "WARNING: k value is larger than the number of documents in the index!",
-                f"Lowering k to {len(self.searcher.collection)}...",
-            )
-            k = len(self.searcher.collection)
-
-        # For smaller collections, we need a higher ncells value to ensure we return enough results
-        if k > (32 * self.searcher.config.ncells):
-            self.searcher.configure(ncells=min((k // 32 + 2), base_ncells))
-
-        self.searcher.configure(ndocs=max(k * 4, base_ndocs))
-
-        if isinstance(query, str):
-            query_length = int(len(query.split(" ")) * 1.35)
-            self._upgrade_searcher_maxlen(query_length)
-            results = [self._search(query, k, pids)]
-        else:
-            longest_query_length = max([int(len(x.split(" ")) * 1.35) for x in query])
-            self._upgrade_searcher_maxlen(longest_query_length)
-            results = self._batch_search(query, k)
 
         to_return = []
-
         for result in results:
             result_for_query = []
             for id_, rank, score in zip(*result):
@@ -497,25 +442,17 @@ class ColBERT(LateInteractionModel):
 
             to_return.append(result_for_query)
 
-        # Restore original ncells&ndocs if it had to be changed for large k values
-        self.searcher.configure(ncells=base_ncells)
-        self.searcher.configure(ndocs=base_ndocs)
-
         if len(to_return) == 1:
             return to_return[0]
         return to_return
 
     def _search(self, query: str, k: int, pids: Optional[List[int]] = None):
-        return self.searcher.search(query, k=k, pids=pids)
+        assert self.model_index is not None
+        return self.model_index._search(query, k, pids)
 
     def _batch_search(self, query: list[str], k: int):
-        queries = {i: x for i, x in enumerate(query)}
-        results = self.searcher.search_all(queries, k=k)
-        results = [
-            [list(zip(*value))[i] for i in range(3)]
-            for value in results.todict().values()
-        ]
-        return results
+        assert self.model_index is not None
+        return self.model_index._batch_search(query, k)
 
     def train(self, data_dir, training_config: ColBERTConfig):
         training_config = ColBERTConfig.from_existing(self.config, training_config)

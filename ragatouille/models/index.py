@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
 from time import time
-from typing import Any, List, Literal, Optional, TypeAlias, Union
+from typing import Any, List, Literal, Optional, TypeAlias, TypeVar, Union
 
 from colbert import IndexUpdater, Indexer, Searcher
 from colbert.infra import ColBERTConfig
@@ -48,15 +48,38 @@ class ModelIndex(ABC):
         ...
 
     @abstractmethod
-    def build(self) -> None:
+    def build(
+        self,
+        checkpoint: Union[str, Path],
+        collection: List[str],
+        index_name: Optional["str"] = None,
+        overwrite: Union[bool, str] = "reuse",
+        verbose: bool = True,
+    ) -> None:
         ...
 
     @abstractmethod
-    def search(self) -> None:
+    def search(
+        self,
+        config: ColBERTConfig,
+        checkpoint: Union[str, Path],
+        collection: List[str],
+        index_name: Optional[str],
+        base_model_max_tokens: int,
+        query: Union[str, list[str]],
+        k: int = 10,
+        pids: Optional[List[int]] = None,
+        force_reload: bool = False,
+        **kwargs,
+    ) -> list[tuple[list, list, list]]:
         ...
 
     @abstractmethod
-    def batch_search(self) -> None:
+    def _search(self, query: str, k: int, pids: Optional[List[int]] = None):
+        ...
+
+    @abstractmethod
+    def _batch_search(self, query: list[str], k: int):
         ...
 
     @abstractmethod
@@ -109,6 +132,7 @@ class PLAIDModelIndex(ModelIndex):
 
     def __init__(self, config: ColBERTConfig) -> None:
         super().__init__(config)
+        self.searcher: Optional[Searcher] = None
 
     @staticmethod
     def construct(
@@ -188,11 +212,121 @@ class PLAIDModelIndex(ModelIndex):
         indexer.index(name=index_name, collection=collection, overwrite=overwrite)
         return self
 
-    def search(self) -> None:
-        raise NotImplementedError()
+    def _load_searcher(
+        self,
+        checkpoint: Union[str, Path],
+        collection: List[str],
+        index_name: Optional[str],
+        force_fast: bool = False,
+    ):
+        print(
+            f"Loading searcher for index {index_name} for the first time...",
+            "This may take a few seconds",
+        )
+        self.searcher = Searcher(
+            checkpoint=checkpoint,
+            config=None,
+            collection=collection,
+            index_root=self.config.root,
+            index=index_name,
+        )
 
-    def batch_search(self) -> None:
-        raise NotImplementedError()
+        if not force_fast:
+            self.searcher.configure(ndocs=1024)
+            self.searcher.configure(ncells=16)
+            if len(self.searcher.collection) < 10000:
+                self.searcher.configure(ncells=8)
+                self.searcher.configure(centroid_score_threshold=0.4)
+            elif len(self.searcher.collection) < 100000:
+                self.searcher.configure(ncells=4)
+                self.searcher.configure(centroid_score_threshold=0.45)
+            # Otherwise, use defaults for k
+        else:
+            # Use fast settingss
+            self.searcher.configure(ncells=1)
+            self.searcher.configure(centroid_score_threshold=0.5)
+            self.searcher.configure(ndocs=256)
+
+        print("Searcher loaded!")
+
+    def _search(self, query: str, k: int, pids: Optional[List[int]] = None):
+        assert self.searcher is not None
+        return self.searcher.search(query, k=k, pids=pids)
+
+    def _batch_search(self, query: list[str], k: int):
+        assert self.searcher is not None
+        queries = {i: x for i, x in enumerate(query)}
+        results = self.searcher.search_all(queries, k=k)
+        results = [
+            [list(zip(*value))[i] for i in range(3)]
+            for value in results.todict().values()
+        ]
+        return results
+
+    def _upgrade_searcher_maxlen(self, maxlen: int, base_model_max_tokens: int):
+        assert self.searcher is not None
+        # Keep maxlen stable at 32 for short queries for easier visualisation
+        maxlen = min(max(maxlen, 32), base_model_max_tokens)
+        self.searcher.config.query_maxlen = maxlen
+        self.searcher.checkpoint.query_tokenizer.query_maxlen = maxlen
+
+    def search(
+        self,
+        config: ColBERTConfig,
+        checkpoint: Union[str, Path],
+        collection: List[str],
+        index_name: Optional[str],
+        base_model_max_tokens: int,
+        query: Union[str, list[str]],
+        k: int = 10,
+        pids: Optional[List[int]] = None,
+        force_reload: bool = False,
+        **kwargs,
+    ) -> list[tuple[list, list, list]]:
+        self.config = config
+
+        force_fast = kwargs.get("force_fast", False)
+        assert isinstance(force_fast, bool)
+
+        if self.searcher is None or force_reload:
+            self._load_searcher(
+                checkpoint,
+                collection,
+                index_name,
+                force_fast,
+            )
+        assert self.searcher is not None
+
+        base_ncells = self.searcher.config.ncells
+        base_ndocs = self.searcher.config.ndocs
+
+        if k > len(self.searcher.collection):
+            print(
+                "WARNING: k value is larger than the number of documents in the index!",
+                f"Lowering k to {len(self.searcher.collection)}...",
+            )
+            k = len(self.searcher.collection)
+
+        # For smaller collections, we need a higher ncells value to ensure we return enough results
+        if k > (32 * self.searcher.config.ncells):
+            self.searcher.configure(ncells=min((k // 32 + 2), base_ncells))
+
+        self.searcher.configure(ndocs=max(k * 4, base_ndocs))
+
+        if isinstance(query, str):
+            query_length = int(len(query.split(" ")) * 1.35)
+            self._upgrade_searcher_maxlen(query_length, base_model_max_tokens)
+            results = [self._search(query, k, pids)]
+        else:
+            longest_query_length = max([int(len(x.split(" ")) * 1.35) for x in query])
+            self._upgrade_searcher_maxlen(longest_query_length, base_model_max_tokens)
+            results = self._batch_search(query, k)
+
+        # Restore original ncells&ndocs if it had to be changed for large k values
+        self.searcher.configure(ncells=base_ncells)
+        self.searcher.configure(ndocs=base_ndocs)
+
+        return results  # type: ignore
 
     @staticmethod
     def _should_rebuild(current_len: int, new_doc_len: int) -> bool:
