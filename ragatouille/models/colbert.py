@@ -146,12 +146,28 @@ class ColBERT(LateInteractionModel):
             "add_to_index support will be more thorough in future versions",
         )
 
+        if self.loaded_from_index:
+            index_root = self.config.root
+        else:
+            expected_path_segment = Path(self.config.experiment) / "indexes"
+            if str(expected_path_segment) in self.config.root:
+                index_root = self.config.root
+            else:
+                index_root = str(Path(self.config.root) / expected_path_segment)
+
+            if not self.collection:
+                collection_path = Path(index_root) / self.index_name / "collection.json"
+                if collection_path.exists():
+                    self._get_collection_files_from_disk(
+                        str(Path(index_root) / self.index_name)
+                    )
+
         searcher = Searcher(
             checkpoint=self.checkpoint,
             config=None,
             collection=self.collection,
             index=self.index_name,
-            index_root=self.index_root,
+            index_root=index_root,
             verbose=self.verbose,
         )
 
