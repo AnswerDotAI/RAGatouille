@@ -219,12 +219,6 @@ def test_document_metadata_returned_in_search_results(
             ), "The metadata should not be returned in the results."
 
 
-# TODO: move this to separate CRUD test file
-@pytest.mark.skip(reason="NotImplemented")
-def test_add_to_empty_index():
-    pass
-
-
 # TODO: move this to a separate CRUD test file
 # TODO: add checks for metadata and doc content
 def test_add_to_existing_index(
