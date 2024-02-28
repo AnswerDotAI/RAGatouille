@@ -74,7 +74,15 @@ class ModelIndex(ABC):
         ...
 
     @abstractmethod
-    def delete(self) -> None:
+    def delete(
+        self,
+        config: ColBERTConfig,
+        checkpoint: Union[str, Path],
+        collection: List[str],
+        index_name: str,
+        pids_to_remove: Union[TypeVar("T"), List[TypeVar("T")]],
+        verbose: bool = True,
+    ) -> None:
         ...
 
     @abstractmethod
@@ -239,8 +247,29 @@ class PLAIDModelIndex(ModelIndex):
             updater.add(new_collection)
             updater.persist_to_disk()
 
-    def delete(self) -> None:
-        raise NotImplementedError()
+    def delete(
+        self,
+        config: ColBERTConfig,
+        checkpoint: Union[str, Path],
+        collection: List[str],
+        index_name: str,
+        pids_to_remove: Union[TypeVar("T"), List[TypeVar("T")]],
+        verbose: bool = True,
+    ) -> None:
+        self.config = config
+
+        # Initialize the searcher and updater
+        searcher = Searcher(
+            checkpoint=checkpoint,
+            config=None,
+            collection=collection,
+            index=index_name,
+            verbose=verbose,
+        )
+        updater = IndexUpdater(config=config, searcher=searcher, checkpoint=checkpoint)
+
+        updater.remove(pids_to_remove)
+        updater.persist_to_disk()
 
     def _export_config(self) -> dict[str, Any]:
         return {}

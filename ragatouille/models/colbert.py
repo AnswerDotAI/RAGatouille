@@ -239,26 +239,26 @@ class ColBERT(LateInteractionModel):
             "delete_from_index support will be more thorough in future versions",
         )
 
-        # Initialize the searcher and updater
-        searcher = Searcher(
-            checkpoint=self.checkpoint,
-            config=None,
-            collection=self.collection,
-            index=self.index_name,
-            verbose=self.verbose,
-        )
-        updater = IndexUpdater(
-            config=self.config, searcher=searcher, checkpoint=self.checkpoint
-        )
-
         pids_to_remove = []
         for pid, docid in self.pid_docid_map.items():
             if docid in document_ids:
                 pids_to_remove.append(pid)
 
-        updater.remove(pids_to_remove)
-        updater.persist_to_disk()
+        # TODO We may want to load an existing index here instead;
+        #      For now require that either index() was called, or an existing one was loaded.
+        assert self.model_index is not None
 
+        # TODO We probably want to store some of this in the model_index directly.
+        self.model_index.delete(
+            self.config,
+            self.checkpoint,
+            self.collection,
+            self.index_name,
+            pids_to_remove,
+            verbose=self.verbose != 0,
+        )
+
+        # Update and serialize the index metadata + collection.
         self.collection = [
             doc for pid, doc in enumerate(self.collection) if pid not in pids_to_remove
         ]
@@ -354,21 +354,6 @@ class ColBERT(LateInteractionModel):
             self.docid_pid_map[docid].append(pid)
 
         self.docid_metadata_map = docid_metadata_map
-
-        if torch.cuda.is_available():
-            import faiss
-
-            if not hasattr(faiss, "StandardGpuResources"):
-                print(
-                    "________________________________________________________________________________\n"
-                    "WARNING! You have a GPU available, but only `faiss-cpu` is currently installed.\n",
-                    "This means that indexing will be slow. To make use of your GPU.\n"
-                    "Please install `faiss-gpu` by running:\n"
-                    "pip uninstall --y faiss-cpu & pip install faiss-gpu\n",
-                    "________________________________________________________________________________",
-                )
-                print("Will continue with CPU indexing in 5 seconds...")
-                time.sleep(5)
 
         self.model_index = ModelIndexFactory.construct(
             "PLAID",
