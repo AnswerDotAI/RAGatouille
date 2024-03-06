@@ -214,6 +214,10 @@ class ColBERT(LateInteractionModel):
             updater.add([doc["content"] for doc in new_documents_with_ids])
             updater.persist_to_disk()
 
+            self.collection = self.collection + [
+                doc["content"] for doc in new_documents_with_ids
+            ]
+
             self._write_collection_files_to_disk()
 
         print(
