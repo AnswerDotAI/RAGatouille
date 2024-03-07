@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
 from time import time
-from typing import Any, List, Literal, Optional, TypeAlias, TypeVar, Union
+from typing import Any, List, Literal, Optional, TypeVar, Union
 
 from colbert import IndexUpdater, Indexer, Searcher
 from colbert.infra import ColBERTConfig
@@ -11,7 +11,7 @@ import torch
 import srsly
 
 
-IndexType: TypeAlias = Literal["FLAT", "HNSW", "PLAID"]
+IndexType = Literal["FLAT", "HNSW", "PLAID"]
 
 
 class ModelIndex(ABC):
@@ -156,6 +156,7 @@ class PLAIDModelIndex(ModelIndex):
         config: ColBERTConfig,
         verbose: bool = True,
     ) -> "PLAIDModelIndex":
+        _, _, _, _ = index_path, index_name, index_config, verbose
         return PLAIDModelIndex(config)
 
     def build(
