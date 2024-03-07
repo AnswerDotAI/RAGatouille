@@ -125,7 +125,9 @@ class TrainingDataProcessor:
         else:
             new_negatives = [
                 x
-                for x in random.sample(self.collection, n_new_negatives)
+                for x in random.sample(
+                    self.collection, min(n_new_negatives, len(self.collection))
+                )
                 if x not in passages["positives"] and x not in passages["negatives"]
             ]
 

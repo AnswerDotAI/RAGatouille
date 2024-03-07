@@ -33,6 +33,7 @@ class ColBERT(LateInteractionModel):
         self.verbose = verbose
         self.collection = None
         self.pid_docid_map = None
+        self.docid_pid_map = None
         self.docid_metadata_map = None
         self.base_model_max_tokens = 512
         if n_gpu == -1:
@@ -55,35 +56,10 @@ class ColBERT(LateInteractionModel):
             )
             split_root = str(pretrained_model_name_or_path).split("/")[:-1]
             self.config.root = "/".join(split_root)
+            self.index_root = self.config.root
             self.checkpoint = self.config.checkpoint
             self.index_name = self.config.index_name
-            self.collection = self._get_collection_from_file(
-                str(pretrained_model_name_or_path / "collection.json")
-            )
-            try:
-                self.pid_docid_map = self._get_collection_from_file(
-                    str(pretrained_model_name_or_path / "pid_docid_map.json")
-                )
-                # convert all keys to int when loading from file because saving converts to str
-                self.pid_docid_map = {
-                    int(key): value for key, value in self.pid_docid_map.items()
-                }
-                self.docid_pid_map = defaultdict(list)
-                for pid, docid in self.pid_docid_map.items():
-                    self.docid_pid_map[docid].append(pid)
-                if os.path.exists(
-                    str(pretrained_model_name_or_path / "docid_metadata_map.json")
-                ):
-                    self.docid_metadata_map = self._get_collection_from_file(
-                        str(pretrained_model_name_or_path / "docid_metadata_map.json")
-                    )
-            except Exception:
-                print(
-                    "WARNING: Could not load pid_docid_map or docid_metadata_map from index!",
-                    "This is likely because you are loading an old index.",
-                )
-                self.pid_docid_map = defaultdict(lambda: None)
-                self.docid_metadata_map = defaultdict(lambda: None)
+            self._get_collection_files_from_disk(pretrained_model_name_or_path)
             # TODO: Modify root assignment when loading from HF
 
         else:
@@ -102,7 +78,7 @@ class ColBERT(LateInteractionModel):
             self.checkpoint = pretrained_model_name_or_path
             self.index_name = index_name
             self.config.experiment = "colbert"
-            self.config.root = ".ragatouille/"
+            self.config.root = self.index_root
 
         if not training_mode:
             self.inference_ckpt = Checkpoint(
@@ -116,11 +92,31 @@ class ColBERT(LateInteractionModel):
         self.run_context.__enter__()  # Manually enter the context
         self.searcher = None
 
-    def _get_collection_from_file(self, collection_path: str):
-        return srsly.read_json(collection_path)
+    def _invert_pid_docid_map(self) -> Dict[str, int]:
+        return {v: k for k, v in self.pid_docid_map.items()}
 
-    def _write_collection_to_file(self, collection, collection_path: str):
-        srsly.write_json(collection_path, collection)
+    def _get_collection_files_from_disk(self, index_path: str):
+        self.collection = srsly.read_json(index_path / "collection.json")
+        if os.path.exists(str(index_path / "docid_metadata_map.json")):
+            self.docid_metadata_map = srsly.read_json(
+                str(index_path / "docid_metadata_map.json")
+            )
+        else:
+            self.docid_metadata_map = None
+
+        try:
+            self.pid_docid_map = srsly.read_json(str(index_path / "pid_docid_map.json"))
+        except FileNotFoundError as err:
+            raise FileNotFoundError(
+                "ERROR: Could not load pid_docid_map from index!",
+                "This is likely because you are loading an older, incompatible index.",
+            ) from err
+
+        # convert all keys to int when loading from file because saving converts to str
+        self.pid_docid_map = {
+            int(key): value for key, value in self.pid_docid_map.items()
+        }
+        self.docid_pid_map = self._invert_pid_docid_map()
 
     def add_to_index(
         self,
@@ -151,17 +147,14 @@ class ColBERT(LateInteractionModel):
                 index_root = self.config.root
             else:
                 index_root = str(Path(self.config.root) / expected_path_segment)
-            index_root = str(
-                Path(self.config.root) / Path(self.config.experiment) / "indexes"
-            )
+
             if not self.collection:
                 collection_path = Path(index_root) / self.index_name / "collection.json"
                 if collection_path.exists():
-                    self.collection = self._get_collection_from_file(
-                        str(collection_path)
+                    self._get_collection_files_from_disk(
+                        str(Path(index_root) / self.index_name)
                     )
-                else:
-                    self.collection = []
+            else: self.collection = []
 
         new_documents_with_ids = [
             {"content": doc, "document_id": new_pid_docid_map[pid]}
@@ -197,7 +190,9 @@ class ColBERT(LateInteractionModel):
 
         # TODO This has inconsistent behavior for duplicates.
         if new_docid_metadata_map is not None:
-            self.docid_metadata_map = self.docid_metadata_map or {}
+            self.docid_metadata_map = self.docid_metadata_map or defaultdict(
+                lambda: None
+            )
             self.docid_metadata_map.update(new_docid_metadata_map)
 
         self.docid_pid_map = defaultdict(list)
@@ -210,16 +205,6 @@ class ColBERT(LateInteractionModel):
             f"Successfully updated index with {len(new_documents_with_ids)} new documents!\n",
             f"New index size: {len(self.collection)}",
         )
-
-        # TODO: Double check: seems to implicitly change the index_path in case loaded_from_index
-        self.index_path = str(
-            Path(self.run_config.root)
-            / Path(self.run_config.experiment)
-            / "indexes"
-            / self.index_name
-        )
-
-        return self.index_path
 
     def delete_from_index(
         self,
@@ -267,9 +252,6 @@ class ColBERT(LateInteractionModel):
             for pid, docid in self.pid_docid_map.items()
             if pid not in pids_to_remove
         }
-        self.docid_pid_map = defaultdict(list)
-        for pid, docid in self.pid_docid_map.items():
-            self.docid_pid_map[docid].append(pid)
 
         if self.docid_metadata_map is not None:
             self.docid_metadata_map = {
@@ -281,6 +263,17 @@ class ColBERT(LateInteractionModel):
         self._save_index_metadata()
 
         print(f"Successfully deleted documents with these IDs: {document_ids}")
+
+    def _write_collection_files_to_disk(self):
+        srsly.write_json(self.index_path + "/collection.json", self.collection)
+        srsly.write_json(self.index_path + "/pid_docid_map.json", self.pid_docid_map)
+        if self.docid_metadata_map is not None:
+            srsly.write_json(
+                self.index_path + "/docid_metadata_map.json", self.docid_metadata_map
+            )
+
+        # update the in-memory inverted map every time the files are saved to disk
+        self.docid_pid_map = self._invert_pid_docid_map()
 
     def _save_index_metadata(self):
         assert self.model_index is not None
@@ -294,19 +287,7 @@ class ColBERT(LateInteractionModel):
             model_metadata,
             self.index_path + "/metadata.json",
         )
-
-        self._write_collection_to_file(
-            self.collection, self.index_path + "/collection.json"
-        )
-
-        self._write_collection_to_file(
-            self.pid_docid_map, self.index_path + "/pid_docid_map.json"
-        )
-
-        if self.docid_metadata_map is not None:
-            self._write_collection_to_file(
-                self.docid_metadata_map, self.index_path + "/docid_metadata_map.json"
-            )
+        self._write_collection_files_to_disk()
 
     def index(
         self,

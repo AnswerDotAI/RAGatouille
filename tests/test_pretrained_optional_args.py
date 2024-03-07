@@ -219,69 +219,16 @@ def test_document_metadata_returned_in_search_results(
             ), "The metadata should not be returned in the results."
 
 
-# def test_return_entire_document(index_creation_inputs, index_path_fixture):
-#     if index_creation_inputs["split_documents"] == True:
-#         RAG = RAGPretrainedModel.from_index(index_path_fixture)
-#         results = RAG.search(
-#             "when was miyazaki born",
-#             index_name=index_creation_inputs["index_name"],
-#             return_entire_document=True,
-#         )
-#         for result in results:
-#             assert (
-#                 "entire_document" in result
-#             ), "The full document should be returned in the results."
-#             doc_id = result["document_id"]
-#             expected_document = index_creation_inputs["collection"][
-#                 index_creation_inputs["document_ids"].index(doc_id)
-#             ]
-#             assert (
-#                 result["entire_document"] == expected_document
-#             ), f"The document for document_id {doc_id} should match the provided document."
-#     else:
-#         assert True, "This test is only relevant for split documents."
-
-
-# TODO: move this to a separate test file
-def test_delete_from_index(
-    index_creation_inputs,
-    pid_docid_map_path_fixture,
-    document_metadata_path_fixture,
-    index_path_fixture,
-):
-    RAG = RAGPretrainedModel.from_index(index_path_fixture)
-    deleted_doc_id = index_creation_inputs["document_ids"][0]
-    original_doc_ids = set(index_creation_inputs["document_ids"])
-    RAG.delete_from_index(
-        index_name=index_creation_inputs["index_name"],
-        document_ids=[deleted_doc_id],
-    )
-    pid_docid_map_data = srsly.read_json(pid_docid_map_path_fixture)
-    updated_document_ids = set(list(pid_docid_map_data.values()))
-    assert (
-        deleted_doc_id not in updated_document_ids
-    ), "Deleted document ID should not be in the collection."
-    assert original_doc_ids - updated_document_ids == {
-        deleted_doc_id
-    }, "Only the deleted document ID should be missing from the collection."
-    if "document_metadatas" in index_creation_inputs:
-        document_metadata_dict = srsly.read_json(document_metadata_path_fixture)
-        assert (
-            deleted_doc_id not in document_metadata_dict
-        ), "Deleted document ID should not be in the document metadata."
-        assert original_doc_ids - set(document_metadata_dict.keys()) == {
-            deleted_doc_id
-        }, "Only the deleted document ID should be missing from the document metadata."
-
-
-# TODO: move this to a separate test file
-def test_add_to_index(
+# TODO: move this to a separate CRUD test file
+# TODO: add checks for metadata and doc content
+def test_add_to_existing_index(
     index_creation_inputs,
     document_metadata_path_fixture,
     pid_docid_map_path_fixture,
     index_path_fixture,
 ):
     RAG = RAGPretrainedModel.from_index(index_path_fixture)
+    existing_doc_ids = index_creation_inputs["document_ids"]
     new_doc_ids = ["mononoke", "sabaku_no_tami"]
     new_docs = [
         "Princess Mononoke (Japanese: もののけ姫, Hepburn: Mononoke-hime) is a 1997 Japanese animated epic historical fantasy film written and directed by Hayao Miyazaki and animated by Studio Ghibli for Tokuma Shoten, Nippon Television Network and Dentsu. The film stars the voices of Yōji Matsuda, Yuriko Ishida, Yūko Tanaka, Kaoru Kobayashi, Masahiko Nishimura, Tsunehiko Kamijo, Akihiro Miwa, Mitsuko Mori, and Hisaya Morishige.\nPrincess Mononoke is set in the late Muromachi period of Japan (approximately 1336 to 1573 AD) and includes fantasy elements. The story follows a young Emishi prince named Ashitaka, and his involvement in a struggle between the gods (kami) of a forest and the humans who consume its resources. The film deals with themes of Shinto and environmentalism.\nThe film was released in Japan on July 12, 1997, by Toho, and in the United States on October 29, 1999. This was the first Studio Ghibli film in the United States to be rated PG-13 by the MPA. It was a critical and commercial blockbuster, becoming the highest-grossing film in Japan of 1997, and also held Japan's box office record for domestic films until 2001's Spirited Away, another Miyazaki film. It was dubbed into English with a script by Neil Gaiman and initially distributed in North America by Miramax, where it sold well on home media despite not performing strongly at the box office. The film greatly increased Ghibli's popularity and influence outside Japan.",
@@ -301,10 +248,57 @@ def test_add_to_index(
     document_ids = set(list(pid_docid_map_data.values()))
 
     document_metadata_dict = srsly.read_json(document_metadata_path_fixture)
+    # check for new docs
     for new_doc_id in new_doc_ids:
         assert (
             new_doc_id in document_ids
-        ), f"New document ID {new_doc_id} should be in the pid_docid_map."
+        ), f"New document ID '{new_doc_id}' should be in the pid_docid_map's document_ids:{document_ids}."
+
         assert (
             new_doc_id in document_metadata_dict
-        ), f"New document ID {new_doc_id} should be in the document metadata."
+        ), f"New document ID '{new_doc_id}' should be in the document metadata keys:{document_metadata_dict.keys}."
+
+    for existing_doc_id in existing_doc_ids:
+        assert (
+            existing_doc_id in document_ids
+        ), f"Old document ID '{existing_doc_id}' should be in the pid_docid_map's document_ids:{document_ids}."
+
+        if "document_metadatas" in index_creation_inputs:
+            assert (
+                existing_doc_id in document_metadata_dict
+            ), f"Old document ID '{existing_doc_id}' should be in the document metadata keys:{document_metadata_dict.keys}."
+
+
+# TODO: move this to a separate CRUD test file
+def test_delete_from_index(
+    index_creation_inputs,
+    pid_docid_map_path_fixture,
+    document_metadata_path_fixture,
+    index_path_fixture,
+):
+    RAG = RAGPretrainedModel.from_index(index_path_fixture)
+    deleted_doc_id = index_creation_inputs["document_ids"][0]
+    original_doc_ids = set(index_creation_inputs["document_ids"])
+    RAG.delete_from_index(
+        index_name=index_creation_inputs["index_name"],
+        document_ids=[deleted_doc_id],
+    )
+    pid_docid_map_data = srsly.read_json(pid_docid_map_path_fixture)
+    updated_document_ids = set(list(pid_docid_map_data.values()))
+
+    assert (
+        deleted_doc_id not in updated_document_ids
+    ), f"Deleted document ID '{deleted_doc_id}' should not be in the pid_docid_map's document_ids: {updated_document_ids}."
+
+    assert (
+        original_doc_ids - updated_document_ids == {deleted_doc_id}
+    ), f"Only the deleted document ID '{deleted_doc_id}' should be missing from the pid_docid_map's document_ids: {updated_document_ids}."
+
+    if "document_metadatas" in index_creation_inputs:
+        document_metadata_dict = srsly.read_json(document_metadata_path_fixture)
+        assert (
+            deleted_doc_id not in document_metadata_dict
+        ), f"Deleted document ID '{deleted_doc_id}' should not be in the document metadata: {document_metadata_dict.keys}."
+        assert (
+            original_doc_ids - set(document_metadata_dict.keys()) == {deleted_doc_id}
+        ), f"Only the deleted document ID '{deleted_doc_id}' should be missing from the document metadata: {document_metadata_dict.keys}."

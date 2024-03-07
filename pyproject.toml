@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "RAGatouille"
-version = "0.0.7post5"
+version = "0.0.7post9"
 description = "Library to facilitate the use of state-of-the-art retrieval models in common RAG contexts."
 authors = ["Benjamin Clavie <ben@clavie.eu>"]
 license = "Apache-2.0"
@@ -9,7 +9,7 @@ packages = [{include = "ragatouille"}]
 repository = "https://github.com/bclavie/ragatouille"
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = ">=3.8.1,<4.0"
 ruff = "^0.1.9"
 faiss-cpu = "^1.7.4"
 transformers = "^4.36.2"
