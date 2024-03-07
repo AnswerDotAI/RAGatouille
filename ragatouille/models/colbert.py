@@ -283,10 +283,7 @@ class ColBERT(LateInteractionModel):
         index_config["index_name"] = self.index_name
         # Ensure that the additional metadata we store does not collide with anything else.
         model_metadata["RAGatouille"] = {"index_config": index_config}  # type: ignore
-        self._write_collection_to_file(
-            model_metadata,
-            self.index_path + "/metadata.json",
-        )
+        srsly.write_json(self.index_path + "/metadata.json", model_metadata)
         self._write_collection_files_to_disk()
 
     def index(
