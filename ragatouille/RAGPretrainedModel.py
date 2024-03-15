@@ -180,6 +180,7 @@ class RAGPretrainedModel:
         document_splitter_fn: Optional[Callable] = llama_index_sentence_splitter,
         preprocessing_fn: Optional[Union[Callable, list[Callable]]] = None,
         bsize: int = 32,
+        use_faiss: bool = False,
     ):
         """Build an index from a list of documents.
 
@@ -215,6 +216,7 @@ class RAGPretrainedModel:
             max_document_length=max_document_length,
             overwrite=overwrite_index,
             bsize=bsize,
+            use_faiss=use_faiss,
         )
 
     def add_to_index(
@@ -227,6 +229,7 @@ class RAGPretrainedModel:
         document_splitter_fn: Optional[Callable] = llama_index_sentence_splitter,
         preprocessing_fn: Optional[Union[Callable, list[Callable]]] = None,
         bsize: int = 32,
+        use_faiss: bool = False,
     ):
         """Add documents to an existing index.
 
@@ -258,6 +261,7 @@ class RAGPretrainedModel:
             new_docid_metadata_map=new_docid_metadata_map,
             index_name=index_name,
             bsize=bsize,
+            use_faiss=use_faiss,
         )
 
     def delete_from_index(
