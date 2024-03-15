@@ -8,11 +8,12 @@ from typing import Dict, List, Literal, Optional, TypeVar, Union
 import numpy as np
 import srsly
 import torch
-from colbert import Indexer, IndexUpdater, Searcher, Trainer
+from colbert import Trainer
 from colbert.infra import ColBERTConfig, Run, RunConfig
 from colbert.modeling.checkpoint import Checkpoint
 
 from ragatouille.models.base import LateInteractionModel
+from ragatouille.models.index import ModelIndex, ModelIndexFactory
 
 # TODO: Move all bsize related calcs to `_set_bsize()`
 
@@ -34,19 +35,22 @@ class ColBERT(LateInteractionModel):
         self.pid_docid_map = None
         self.docid_pid_map = None
         self.docid_metadata_map = None
-        self.in_memory_docs = []
         self.base_model_max_tokens = 512
         if n_gpu == -1:
             n_gpu = 1 if torch.cuda.device_count() == 0 else torch.cuda.device_count()
 
         self.loaded_from_index = load_from_index
 
+        self.model_index: Optional[ModelIndex] = None
         if load_from_index:
             self.index_path = str(pretrained_model_name_or_path)
             ckpt_config = ColBERTConfig.load_from_index(
                 str(pretrained_model_name_or_path)
             )
-            self.config = ckpt_config
+            self.model_index = ModelIndexFactory.load_from_file(
+                self.index_path, index_name, ckpt_config
+            )
+            self.config = self.model_index.config
             self.run_config = RunConfig(
                 nranks=n_gpu, experiment=self.config.experiment, root=self.config.root
             )
@@ -114,17 +118,6 @@ class ColBERT(LateInteractionModel):
         }
         self.docid_pid_map = self._invert_pid_docid_map()
 
-    def _write_collection_files_to_disk(self):
-        srsly.write_json(self.index_path + "/collection.json", self.collection)
-        srsly.write_json(self.index_path + "/pid_docid_map.json", self.pid_docid_map)
-        if self.docid_metadata_map is not None:
-            srsly.write_json(
-                self.index_path + "/docid_metadata_map.json", self.docid_metadata_map
-            )
-
-        # update the in-memory inverted map every time the files are saved to disk
-        self.docid_pid_map = self._invert_pid_docid_map()
-
     def add_to_index(
         self,
         new_documents: List[str],
@@ -162,63 +155,54 @@ class ColBERT(LateInteractionModel):
                         str(Path(index_root) / self.index_name)
                     )
 
-        searcher = Searcher(
-            checkpoint=self.checkpoint,
-            config=None,
-            collection=self.collection,
-            index=self.index_name,
-            index_root=index_root,
-            verbose=self.verbose,
-        )
-
-        current_len = len(searcher.collection)
-        new_doc_len = len(new_documents)
         new_documents_with_ids = [
             {"content": doc, "document_id": new_pid_docid_map[pid]}
             for pid, doc in enumerate(new_documents)
             if new_pid_docid_map[pid] not in self.pid_docid_map.values()
         ]
 
+        max_existing_pid = max(self.pid_docid_map.keys(), default=-1)
+        for idx, doc in enumerate(new_documents_with_ids, start=max_existing_pid + 1):
+            self.pid_docid_map[idx] = doc["document_id"]
+
+        new_collection = [doc["content"] for doc in new_documents_with_ids]
+
+        # TODO We may want to load an existing index here instead;
+        #      For now require that either index() was called, or an existing one was loaded.
+        assert self.model_index is not None
+
+        # TODO We probably want to store some of this in the model_index directly.
+        self.model_index.add(
+            self.config,
+            self.checkpoint,
+            self.collection,
+            index_root,
+            self.index_name,
+            new_collection,
+            verbose=self.verbose != 0,
+            bsize=bsize,
+        )
+        self.config = self.model_index.config
+
+        # Update and serialize the index metadata + collection.
+        self.collection = self.collection + new_collection
+
+        # TODO This has inconsistent behavior for duplicates.
         if new_docid_metadata_map is not None:
             self.docid_metadata_map = self.docid_metadata_map or defaultdict(
                 lambda: None
             )
             self.docid_metadata_map.update(new_docid_metadata_map)
 
-        max_existing_pid = max(self.pid_docid_map.keys(), default=-1)
-        for idx, doc in enumerate(new_documents_with_ids, start=max_existing_pid + 1):
-            self.pid_docid_map[idx] = doc["document_id"]
+        self.docid_pid_map = defaultdict(list)
+        for pid, docid in self.pid_docid_map.items():
+            self.docid_pid_map[docid].append(pid)
 
-        combined_documents = self.collection + [
-            doc["content"] for doc in new_documents_with_ids
-        ]
-
-        if current_len + new_doc_len < 5000 or new_doc_len > current_len * 0.05:
-            self.index(
-                combined_documents,
-                self.pid_docid_map,
-                docid_metadata_map=self.docid_metadata_map,
-                index_name=self.index_name,
-                max_document_length=self.config.doc_maxlen,
-                overwrite="force_silent_overwrite",
-                bsize=bsize,
-            )
-        else:
-            if self.config.index_bsize != bsize:  # Update bsize if it's different
-                self.config.index_bsize = bsize
-
-            updater = IndexUpdater(
-                config=self.config, searcher=searcher, checkpoint=self.checkpoint
-            )
-
-            updater.add([doc["content"] for doc in new_documents_with_ids])
-            updater.persist_to_disk()
-
-            self._write_collection_files_to_disk()
+        self._save_index_metadata()
 
         print(
             f"Successfully updated index with {len(new_documents_with_ids)} new documents!\n",
-            f"New index size: {current_len + len(new_documents_with_ids)}",
+            f"New index size: {len(self.collection)}",
         )
 
     def delete_from_index(
@@ -239,26 +223,26 @@ class ColBERT(LateInteractionModel):
             "delete_from_index support will be more thorough in future versions",
         )
 
-        # Initialize the searcher and updater
-        searcher = Searcher(
-            checkpoint=self.checkpoint,
-            config=None,
-            collection=self.collection,
-            index=self.index_name,
-            verbose=self.verbose,
-        )
-        updater = IndexUpdater(
-            config=self.config, searcher=searcher, checkpoint=self.checkpoint
-        )
-
         pids_to_remove = []
         for pid, docid in self.pid_docid_map.items():
             if docid in document_ids:
                 pids_to_remove.append(pid)
 
-        updater.remove(pids_to_remove)
-        updater.persist_to_disk()
+        # TODO We may want to load an existing index here instead;
+        #      For now require that either index() was called, or an existing one was loaded.
+        assert self.model_index is not None
 
+        # TODO We probably want to store some of this in the model_index directly.
+        self.model_index.delete(
+            self.config,
+            self.checkpoint,
+            self.collection,
+            self.index_name,
+            pids_to_remove,
+            verbose=self.verbose != 0,
+        )
+
+        # Update and serialize the index metadata + collection.
         self.collection = [
             doc for pid, doc in enumerate(self.collection) if pid not in pids_to_remove
         ]
@@ -275,9 +259,31 @@ class ColBERT(LateInteractionModel):
                 if docid not in document_ids
             }
 
-        self._write_collection_files_to_disk()
+        self._save_index_metadata()
 
         print(f"Successfully deleted documents with these IDs: {document_ids}")
+
+    def _write_collection_files_to_disk(self):
+        srsly.write_json(self.index_path + "/collection.json", self.collection)
+        srsly.write_json(self.index_path + "/pid_docid_map.json", self.pid_docid_map)
+        if self.docid_metadata_map is not None:
+            srsly.write_json(
+                self.index_path + "/docid_metadata_map.json", self.docid_metadata_map
+            )
+
+        # update the in-memory inverted map every time the files are saved to disk
+        self.docid_pid_map = self._invert_pid_docid_map()
+
+    def _save_index_metadata(self):
+        assert self.model_index is not None
+
+        model_metadata = srsly.read_json(self.index_path + "/metadata.json")
+        index_config = self.model_index.export_metadata()
+        index_config["index_name"] = self.index_name
+        # Ensure that the additional metadata we store does not collide with anything else.
+        model_metadata["RAGatouille"] = {"index_config": index_config}  # type: ignore
+        srsly.write_json(self.index_path + "/metadata.json", model_metadata)
+        self._write_collection_files_to_disk()
 
     def index(
         self,
@@ -289,21 +295,9 @@ class ColBERT(LateInteractionModel):
         overwrite: Union[bool, str] = "reuse",
         bsize: int = 32,
     ):
-        if torch.cuda.is_available():
-            import faiss
-
-            if not hasattr(faiss, "StandardGpuResources"):
-                print(
-                    "________________________________________________________________________________\n"
-                    "WARNING! You have a GPU available, but only `faiss-cpu` is currently installed.\n",
-                    "This means that indexing will be slow. To make use of your GPU.\n"
-                    "Please install `faiss-gpu` by running:\n"
-                    "pip uninstall --y faiss-cpu & pip install faiss-gpu\n",
-                    "________________________________________________________________________________",
-                )
-                print("Will continue with CPU indexing in 5 seconds...")
-                time.sleep(5)
+        self.collection = collection
         self.config.doc_maxlen = max_document_length
+
         if index_name is not None:
             if self.index_name is not None:
                 print(
@@ -319,38 +313,6 @@ class ColBERT(LateInteractionModel):
                 )
             self.index_name = self.checkpoint + "new_index"
 
-        self.collection = collection
-        self.pid_docid_map = pid_docid_map
-        self.docid_metadata_map = docid_metadata_map
-
-        nbits = 2
-        if len(self.collection) < 5000:
-            nbits = 8
-        elif len(self.collection) < 10000:
-            nbits = 4
-        self.config = ColBERTConfig.from_existing(
-            self.config, ColBERTConfig(nbits=nbits, index_bsize=bsize)
-        )
-
-        if len(self.collection) > 100000:
-            self.config.kmeans_niters = 4
-        elif len(self.collection) > 50000:
-            self.config.kmeans_niters = 10
-        else:
-            self.config.kmeans_niters = 20
-
-        # Instruct colbert-ai to disable forking if nranks == 1
-        self.config.avoid_fork_if_possible = True
-        self.indexer = Indexer(
-            checkpoint=self.checkpoint,
-            config=self.config,
-            verbose=self.verbose,
-        )
-        self.indexer.configure(avoid_fork_if_possible=True)
-        self.indexer.index(
-            name=self.index_name, collection=self.collection, overwrite=overwrite
-        )
-
         self.index_path = str(
             Path(self.run_config.root)
             / Path(self.run_config.experiment)
@@ -361,17 +323,48 @@ class ColBERT(LateInteractionModel):
             Path(self.run_config.root) / Path(self.run_config.experiment) / "indexes"
         )
 
-        self._write_collection_files_to_disk()
+        self.pid_docid_map = pid_docid_map
+
+        # inverted mapping for returning full docs
+        self.docid_pid_map = defaultdict(list)
+        for pid, docid in self.pid_docid_map.items():
+            self.docid_pid_map[docid].append(pid)
+
+        self.docid_metadata_map = docid_metadata_map
+
+        self.model_index = ModelIndexFactory.construct(
+            "PLAID",
+            self.config,
+            self.checkpoint,
+            self.collection,
+            self.index_name,
+            overwrite,
+            verbose=self.verbose != 0,
+            bsize=bsize,
+        )
+        self.config = self.model_index.config
+        self._save_index_metadata()
 
         print("Done indexing!")
 
         return self.index_path
 
-    def _load_searcher(
+    def search(
         self,
-        index_name: Optional[str],
+        query: Union[str, list[str]],
+        index_name: Optional["str"] = None,
+        k: int = 10,
         force_fast: bool = False,
+        zero_index_ranks: bool = False,
+        doc_ids: Optional[List[str]] = None,
     ):
+        pids = None
+        if doc_ids is not None:
+            pids = []
+            for doc_id in doc_ids:
+                pids.extend(self.docid_pid_map[doc_id])
+
+        force_reload = self.index_name is not None and index_name != self.index_name
         if index_name is not None:
             if self.index_name is not None:
                 print(
@@ -386,91 +379,25 @@ class ColBERT(LateInteractionModel):
                     "Returning empty results.",
                 )
                 return None
-        print(
-            f"Loading searcher for index {self.index_name} for the first time...",
-            "This may take a few seconds",
+
+        # TODO We may want to load an existing index here instead;
+        #      For now require that either index() was called, or an existing one was loaded.
+        assert self.model_index is not None
+
+        results = self.model_index.search(
+            self.config,
+            self.checkpoint,
+            self.collection,
+            self.index_name,
+            self.base_model_max_tokens,
+            query,
+            k,
+            pids,
+            force_reload,
+            force_fast=force_fast,
         )
-        self.searcher = Searcher(
-            checkpoint=self.checkpoint,
-            config=None,
-            collection=self.collection,
-            index_root=self.config.root,
-            index=self.index_name,
-        )
-
-        if not force_fast:
-            self.searcher.configure(ndocs=1024)
-            self.searcher.configure(ncells=16)
-            if len(self.searcher.collection) < 10000:
-                self.searcher.configure(ncells=8)
-                self.searcher.configure(centroid_score_threshold=0.4)
-            elif len(self.searcher.collection) < 100000:
-                self.searcher.configure(ncells=4)
-                self.searcher.configure(centroid_score_threshold=0.45)
-            # Otherwise, use defaults for k
-        else:
-            # Use fast settingss
-            self.searcher.configure(ncells=1)
-            self.searcher.configure(centroid_score_threshold=0.5)
-            self.searcher.configure(ndocs=256)
-
-        print("Searcher loaded!")
-
-    def _upgrade_searcher_maxlen(self, maxlen: int):
-        if maxlen < 32:
-            # Keep maxlen stable at 32 for short queries for easier visualisation
-            maxlen = 32
-        maxlen = min(maxlen, self.base_model_max_tokens)
-        self.searcher.config.query_maxlen = maxlen
-        self.searcher.checkpoint.query_tokenizer.query_maxlen = maxlen
-
-    def search(
-        self,
-        query: Union[str, list[str]],
-        index_name: Optional["str"] = None,
-        k: int = 10,
-        force_fast: bool = False,
-        zero_index_ranks: bool = False,
-        doc_ids: Optional[List[str]] = None,
-    ):
-        if self.searcher is None or (
-            index_name is not None and self.index_name != index_name
-        ):
-            self._load_searcher(index_name=index_name, force_fast=force_fast)
-
-        pids = None
-        if doc_ids is not None:
-            pids = []
-            for doc_id in doc_ids:
-                pids.extend(self.docid_pid_map[doc_id])
-
-        base_ncells = self.searcher.config.ncells
-        base_ndocs = self.searcher.config.ndocs
-
-        if k > len(self.searcher.collection):
-            print(
-                "WARNING: k value is larger than the number of documents in the index!",
-                f"Lowering k to {len(self.searcher.collection)}...",
-            )
-            k = len(self.searcher.collection)
-
-        # For smaller collections, we need a higher ncells value to ensure we return enough results
-        if k > (32 * self.searcher.config.ncells):
-            self.searcher.configure(ncells=min((k // 32 + 2), base_ncells))
-
-        self.searcher.configure(ndocs=max(k * 4, base_ndocs))
-
-        if isinstance(query, str):
-            query_length = int(len(query.split(" ")) * 1.35)
-            self._upgrade_searcher_maxlen(query_length)
-            results = [self._search(query, k, pids)]
-        else:
-            longest_query_length = max([int(len(x.split(" ")) * 1.35) for x in query])
-            self._upgrade_searcher_maxlen(longest_query_length)
-            results = self._batch_search(query, k)
 
         to_return = []
-
         for result in results:
             result_for_query = []
             for id_, rank, score in zip(*result):
@@ -492,25 +419,17 @@ class ColBERT(LateInteractionModel):
 
             to_return.append(result_for_query)
 
-        # Restore original ncells&ndocs if it had to be changed for large k values
-        self.searcher.configure(ncells=base_ncells)
-        self.searcher.configure(ndocs=base_ndocs)
-
         if len(to_return) == 1:
             return to_return[0]
         return to_return
 
     def _search(self, query: str, k: int, pids: Optional[List[int]] = None):
-        return self.searcher.search(query, k=k, pids=pids)
+        assert self.model_index is not None
+        return self.model_index._search(query, k, pids)
 
     def _batch_search(self, query: list[str], k: int):
-        queries = {i: x for i, x in enumerate(query)}
-        results = self.searcher.search_all(queries, k=k)
-        results = [
-            [list(zip(*value))[i] for i in range(3)]
-            for value in results.todict().values()
-        ]
-        return results
+        assert self.model_index is not None
+        return self.model_index._batch_search(query, k)
 
     def train(self, data_dir, training_config: ColBERTConfig):
         training_config = ColBERTConfig.from_existing(self.config, training_config)
