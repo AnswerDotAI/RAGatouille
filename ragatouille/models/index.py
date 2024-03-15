@@ -198,7 +198,7 @@ class PLAIDModelIndex(ModelIndex):
 
         # Monkey-patch colbert-ai to avoid using FAISS
         monkey_patching = False
-        if len(collection) < 1000000 and kwargs.get("use_faiss", False) is False:
+        if len(collection) < 500000 and kwargs.get("use_faiss", False) is False:
             print(
                 "---- WARNING! You are using PLAID with an experimental replacement for FAISS for greater compatibility ----"
             )
