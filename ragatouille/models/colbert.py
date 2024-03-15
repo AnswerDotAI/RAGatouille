@@ -8,7 +8,7 @@ from typing import Dict, List, Literal, Optional, TypeVar, Union
 import numpy as np
 import srsly
 import torch
-from colbert import IndexUpdater, Searcher, Trainer
+from colbert import Trainer
 from colbert.infra import ColBERTConfig, Run, RunConfig
 from colbert.modeling.checkpoint import Checkpoint
 
@@ -154,7 +154,6 @@ class ColBERT(LateInteractionModel):
                     self._get_collection_files_from_disk(
                         str(Path(index_root) / self.index_name)
                     )
-            else: self.collection = []
 
         new_documents_with_ids = [
             {"content": doc, "document_id": new_pid_docid_map[pid]}

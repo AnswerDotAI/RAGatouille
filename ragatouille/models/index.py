@@ -3,13 +3,10 @@ from pathlib import Path
 from time import time
 from typing import Any, List, Literal, Optional, TypeVar, Union
 
-from colbert import IndexUpdater, Indexer, Searcher
-from colbert.infra import ColBERTConfig
-
-import torch
-
 import srsly
-
+import torch
+from colbert import Indexer, IndexUpdater, Searcher
+from colbert.infra import ColBERTConfig
 
 IndexType = Literal["FLAT", "HNSW", "PLAID"]
 
