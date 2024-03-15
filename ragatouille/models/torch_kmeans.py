@@ -1,8 +1,9 @@
-import torch
 import time
 
+import torch
 
-def _train_kmeans(self, sample, shared_lists):
+
+def _train_kmeans(self, sample, shared_lists):  # noqa: ARG001
     if self.use_gpu:
         torch.cuda.empty_cache()
     centroids = compute_pytorch_kmeans(

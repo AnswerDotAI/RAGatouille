@@ -3,13 +3,13 @@ from pathlib import Path
 from time import time
 from typing import Any, List, Literal, Optional, TypeVar, Union
 
-from ragatouille.models import torch_kmeans
-
 import srsly
 import torch
 from colbert import Indexer, IndexUpdater, Searcher
-from colbert.infra import ColBERTConfig
 from colbert.indexing.collection_indexer import CollectionIndexer
+from colbert.infra import ColBERTConfig
+
+from ragatouille.models import torch_kmeans
 
 IndexType = Literal["FLAT", "HNSW", "PLAID"]
 
