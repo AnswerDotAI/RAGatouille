@@ -26,7 +26,7 @@ def compute_pytorch_kmeans(
     num_partitions,
     kmeans_niters,
     use_gpu,
-    batch_size=256000,
+    batch_size=512000,
     tol=1e-4,
     verbose=1,
 ):
