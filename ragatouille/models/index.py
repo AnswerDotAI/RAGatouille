@@ -3,10 +3,13 @@ from pathlib import Path
 from time import time
 from typing import Any, List, Literal, Optional, TypeVar, Union
 
+from ragatouille.models import torch_kmeans
+
 import srsly
 import torch
 from colbert import Indexer, IndexUpdater, Searcher
 from colbert.infra import ColBERTConfig
+from colbert.indexing.collection_indexer import CollectionIndexer
 
 IndexType = Literal["FLAT", "HNSW", "PLAID"]
 
@@ -30,8 +33,7 @@ class ModelIndex(ABC):
         overwrite: Union[bool, str] = "reuse",
         verbose: bool = True,
         **kwargs,
-    ) -> "ModelIndex":
-        ...
+    ) -> "ModelIndex": ...
 
     @staticmethod
     @abstractmethod
@@ -41,8 +43,7 @@ class ModelIndex(ABC):
         index_config: dict[str, Any],
         config: ColBERTConfig,
         verbose: bool = True,
-    ) -> "ModelIndex":
-        ...
+    ) -> "ModelIndex": ...
 
     @abstractmethod
     def build(
@@ -52,8 +53,7 @@ class ModelIndex(ABC):
         index_name: Optional["str"] = None,
         overwrite: Union[bool, str] = "reuse",
         verbose: bool = True,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     @abstractmethod
     def search(
@@ -68,16 +68,13 @@ class ModelIndex(ABC):
         pids: Optional[List[int]] = None,
         force_reload: bool = False,
         **kwargs,
-    ) -> list[tuple[list, list, list]]:
-        ...
+    ) -> list[tuple[list, list, list]]: ...
 
     @abstractmethod
-    def _search(self, query: str, k: int, pids: Optional[List[int]] = None):
-        ...
+    def _search(self, query: str, k: int, pids: Optional[List[int]] = None): ...
 
     @abstractmethod
-    def _batch_search(self, query: list[str], k: int):
-        ...
+    def _batch_search(self, query: list[str], k: int): ...
 
     @abstractmethod
     def add(
@@ -90,8 +87,7 @@ class ModelIndex(ABC):
         new_collection: List[str],
         verbose: bool = True,
         **kwargs,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     @abstractmethod
     def delete(
@@ -102,12 +98,10 @@ class ModelIndex(ABC):
         index_name: str,
         pids_to_remove: Union[TypeVar("T"), List[TypeVar("T")]],
         verbose: bool = True,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     @abstractmethod
-    def _export_config(self) -> dict[str, Any]:
-        ...
+    def _export_config(self) -> dict[str, Any]: ...
 
     def export_metadata(self) -> dict[str, Any]:
         config = self._export_config()
@@ -201,13 +195,51 @@ class PLAIDModelIndex(ModelIndex):
 
         # Instruct colbert-ai to disable forking if nranks == 1
         self.config.avoid_fork_if_possible = True
-        indexer = Indexer(
-            checkpoint=checkpoint,
-            config=self.config,
-            verbose=verbose,
-        )
-        indexer.configure(avoid_fork_if_possible=True)
-        indexer.index(name=index_name, collection=collection, overwrite=overwrite)
+
+        # Monkey-patch colbert-ai to avoid using FAISS
+        monkey_patching = False
+        if len(collection) < 1000000 and kwargs.get("use_faiss", False) is False:
+            print(
+                "---- WARNING! You are using PLAID with an experimental replacement for FAISS for greater compatibility ----"
+            )
+            print("This is a behaviour change from RAGatouille 0.8.0 onwards.")
+            print(
+                "This works fine for most users, but is slower than FAISS and slightly more approximate."
+            )
+            print(
+                "If you're confident with FAISS working issue-free on your machine, pass use_faiss=True to revert to the FAISS-using behaviour."
+            )
+            print("--------------------")
+            CollectionIndexer._original_train_kmeans = CollectionIndexer._train_kmeans
+            CollectionIndexer._train_kmeans = torch_kmeans._train_kmeans
+            monkey_patching = True
+            try:
+                indexer = Indexer(
+                    checkpoint=checkpoint,
+                    config=self.config,
+                    verbose=verbose,
+                )
+                indexer.configure(avoid_fork_if_possible=True)
+                indexer.index(
+                    name=index_name, collection=collection, overwrite=overwrite
+                )
+            except Exception:
+                print(
+                    "PyTorch-based indexing did not succeed! Reverting to using FAISS and attempting again..."
+                )
+                CollectionIndexer._train_kmeans = (
+                    CollectionIndexer._original_train_kmeans
+                )
+                monkey_patching = False
+        if monkey_patching is False:
+            indexer = Indexer(
+                checkpoint=checkpoint,
+                config=self.config,
+                verbose=verbose,
+            )
+            indexer.configure(avoid_fork_if_possible=True)
+            indexer.index(name=index_name, collection=collection, overwrite=overwrite)
+
         return self
 
     def _load_searcher(
