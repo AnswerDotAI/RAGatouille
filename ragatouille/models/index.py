@@ -162,21 +162,6 @@ class PLAIDModelIndex(ModelIndex):
         bsize = kwargs.get("bsize", PLAIDModelIndex._DEFAULT_INDEX_BSIZE)
         assert isinstance(bsize, int)
 
-        if torch.cuda.is_available():
-            import faiss
-
-            if not hasattr(faiss, "StandardGpuResources"):
-                print(
-                    "________________________________________________________________________________\n"
-                    "WARNING! You have a GPU available, but only `faiss-cpu` is currently installed.\n",
-                    "This means that indexing will be slow. To make use of your GPU.\n"
-                    "Please install `faiss-gpu` by running:\n"
-                    "pip uninstall --y faiss-cpu & pip install faiss-gpu\n",
-                    "________________________________________________________________________________",
-                )
-                print("Will continue with CPU indexing in 5 seconds...")
-                time.sleep(5)
-
         nbits = 2
         if len(collection) < 5000:
             nbits = 8
@@ -232,6 +217,20 @@ class PLAIDModelIndex(ModelIndex):
                 )
                 monkey_patching = False
         if monkey_patching is False:
+            if torch.cuda.is_available():
+                import faiss
+
+                if not hasattr(faiss, "StandardGpuResources"):
+                    print(
+                        "________________________________________________________________________________\n"
+                        "WARNING! You have a GPU available, but only `faiss-cpu` is currently installed.\n",
+                        "This means that indexing will be slow. To make use of your GPU.\n"
+                        "Please install `faiss-gpu` by running:\n"
+                        "pip uninstall --y faiss-cpu & pip install faiss-gpu\n",
+                        "________________________________________________________________________________",
+                    )
+                    print("Will continue with CPU indexing in 5 seconds...")
+                    time.sleep(5)
             indexer = Indexer(
                 checkpoint=checkpoint,
                 config=self.config,
