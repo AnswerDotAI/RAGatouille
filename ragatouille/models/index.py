@@ -208,9 +208,10 @@ class PLAIDModelIndex(ModelIndex):
                 indexer.index(
                     name=index_name, collection=collection, overwrite=overwrite
                 )
-            except Exception:
+            except Exception as err:
                 print(
-                    "PyTorch-based indexing did not succeed! Reverting to using FAISS and attempting again..."
+                    f"PyTorch-based indexing did not succeed with error: {err}",
+                    "! Reverting to using FAISS and attempting again...",
                 )
                 CollectionIndexer._train_kmeans = (
                     CollectionIndexer._original_train_kmeans
