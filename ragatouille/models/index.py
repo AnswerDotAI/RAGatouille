@@ -195,7 +195,10 @@ class PLAIDModelIndex(ModelIndex):
                 "If you're confident with FAISS working issue-free on your machine, pass use_faiss=True to revert to the FAISS-using behaviour."
             )
             print("--------------------")
-            CollectionIndexer._original_train_kmeans = CollectionIndexer._train_kmeans
+            if not hasattr(CollectionIndexer, "_original_train_kmeans"):
+                CollectionIndexer._original_train_kmeans = (
+                    CollectionIndexer._train_kmeans
+                )
             CollectionIndexer._train_kmeans = torch_kmeans._train_kmeans
             monkey_patching = True
             try:
