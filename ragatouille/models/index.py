@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from copy import deepcopy
 from pathlib import Path
 from time import time
 from typing import Any, List, Literal, Optional, TypeVar, Union
@@ -33,7 +34,8 @@ class ModelIndex(ABC):
         overwrite: Union[bool, str] = "reuse",
         verbose: bool = True,
         **kwargs,
-    ) -> "ModelIndex": ...
+    ) -> "ModelIndex":
+        ...
 
     @staticmethod
     @abstractmethod
@@ -43,7 +45,8 @@ class ModelIndex(ABC):
         index_config: dict[str, Any],
         config: ColBERTConfig,
         verbose: bool = True,
-    ) -> "ModelIndex": ...
+    ) -> "ModelIndex":
+        ...
 
     @abstractmethod
     def build(
@@ -53,7 +56,8 @@ class ModelIndex(ABC):
         index_name: Optional["str"] = None,
         overwrite: Union[bool, str] = "reuse",
         verbose: bool = True,
-    ) -> None: ...
+    ) -> None:
+        ...
 
     @abstractmethod
     def search(
@@ -68,13 +72,16 @@ class ModelIndex(ABC):
         pids: Optional[List[int]] = None,
         force_reload: bool = False,
         **kwargs,
-    ) -> list[tuple[list, list, list]]: ...
+    ) -> list[tuple[list, list, list]]:
+        ...
 
     @abstractmethod
-    def _search(self, query: str, k: int, pids: Optional[List[int]] = None): ...
+    def _search(self, query: str, k: int, pids: Optional[List[int]] = None):
+        ...
 
     @abstractmethod
-    def _batch_search(self, query: list[str], k: int): ...
+    def _batch_search(self, query: list[str], k: int):
+        ...
 
     @abstractmethod
     def add(
@@ -87,7 +94,8 @@ class ModelIndex(ABC):
         new_collection: List[str],
         verbose: bool = True,
         **kwargs,
-    ) -> None: ...
+    ) -> None:
+        ...
 
     @abstractmethod
     def delete(
@@ -98,10 +106,12 @@ class ModelIndex(ABC):
         index_name: str,
         pids_to_remove: Union[TypeVar("T"), List[TypeVar("T")]],
         verbose: bool = True,
-    ) -> None: ...
+    ) -> None:
+        ...
 
     @abstractmethod
-    def _export_config(self) -> dict[str, Any]: ...
+    def _export_config(self) -> dict[str, Any]:
+        ...
 
     def export_metadata(self) -> dict[str, Any]:
         config = self._export_config()
@@ -120,6 +130,8 @@ class HNSWModelIndex(ModelIndex):
 class PLAIDModelIndex(ModelIndex):
     _DEFAULT_INDEX_BSIZE = 32
     index_type = "PLAID"
+    faiss_kmeans = staticmethod(deepcopy(CollectionIndexer._train_kmeans))
+    pytorch_kmeans = staticmethod(torch_kmeans._train_kmeans)
 
     def __init__(self, config: ColBERTConfig) -> None:
         super().__init__(config)
@@ -171,36 +183,35 @@ class PLAIDModelIndex(ModelIndex):
             self.config, ColBERTConfig(nbits=nbits, index_bsize=bsize)
         )
 
-        if len(collection) > 100000:
-            self.config.kmeans_niters = 4
-        elif len(collection) > 50000:
-            self.config.kmeans_niters = 10
-        else:
-            self.config.kmeans_niters = 20
-
         # Instruct colbert-ai to disable forking if nranks == 1
         self.config.avoid_fork_if_possible = True
 
         # Monkey-patch colbert-ai to avoid using FAISS
-        monkey_patching = False
-        if len(collection) < 500000 and kwargs.get("use_faiss", False) is False:
+        monkey_patching = (
+            len(collection) < 40000 and kwargs.get("use_faiss", False) is False
+        )
+        if monkey_patching:
             print(
                 "---- WARNING! You are using PLAID with an experimental replacement for FAISS for greater compatibility ----"
             )
             print("This is a behaviour change from RAGatouille 0.8.0 onwards.")
             print(
-                "This works fine for most users, but is slower than FAISS and slightly more approximate."
+                "This works fine for most users and smallish datasets, but can be considerably slower than FAISS and could cause worse results in some situations."
             )
             print(
-                "If you're confident with FAISS working issue-free on your machine, pass use_faiss=True to revert to the FAISS-using behaviour."
+                "If you're confident with FAISS working on your machine, pass use_faiss=True to revert to the FAISS-using behaviour."
             )
             print("--------------------")
-            if not hasattr(CollectionIndexer, "_original_train_kmeans"):
-                CollectionIndexer._original_train_kmeans = (
-                    CollectionIndexer._train_kmeans
-                )
-            CollectionIndexer._train_kmeans = torch_kmeans._train_kmeans
-            monkey_patching = True
+            CollectionIndexer._train_kmeans = self.pytorch_kmeans
+
+            # Try to keep runtime stable -- these are values that empirically didn't degrade performance at all on 3 benchmarks.
+            # More tests required before warning can be removed.
+            if len(collection) > 20000:
+                self.config.means_niters = 4
+            elif len(collection) > 10000:
+                self.config.kmeans_niters = 8
+            else:
+                self.config.kmeans_niters = 10
             try:
                 indexer = Indexer(
                     checkpoint=checkpoint,
@@ -216,15 +227,15 @@ class PLAIDModelIndex(ModelIndex):
                     f"PyTorch-based indexing did not succeed with error: {err}",
                     "! Reverting to using FAISS and attempting again...",
                 )
-                CollectionIndexer._train_kmeans = (
-                    CollectionIndexer._original_train_kmeans
-                )
                 monkey_patching = False
         if monkey_patching is False:
-            if hasattr(CollectionIndexer, "_original_train_kmeans"):
-                CollectionIndexer._train_kmeans = (
-                    CollectionIndexer._original_train_kmeans
-                )
+            if len(collection) > 100000:
+                self.config.kmeans_niters = 4
+            elif len(collection) > 50000:
+                self.config.kmeans_niters = 10
+            else:
+                self.config.kmeans_niters = 20
+            CollectionIndexer._train_kmeans = self.faiss_kmeans
             if torch.cuda.is_available():
                 import faiss
 
