@@ -364,9 +364,9 @@ class ColBERT(LateInteractionModel):
             for doc_id in doc_ids:
                 pids.extend(self.docid_pid_map[doc_id])
 
-        force_reload = self.index_name is not None and index_name != self.index_name
+        force_reload = index_name is not None and index_name != self.index_name
         if index_name is not None:
-            if self.index_name is not None:
+            if self.index_name is not None and self.index_name != index_name:
                 print(
                     f"New index_name received!",
                     f"Updating current index_name ({self.index_name}) to {index_name}",
