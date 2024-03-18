@@ -1,4 +1,3 @@
-
 import torch
 from fast_pytorch_kmeans import KMeans
 
@@ -27,7 +26,7 @@ def compute_pytorch_kmeans(
     num_partitions,
     kmeans_niters,
     use_gpu,
-    batch_size=64000,
+    batch_size=16000,
     verbose=1,
     seed=123,
     max_points_per_centroid=256,
@@ -60,8 +59,11 @@ def compute_pytorch_kmeans(
 
     sample = sample.float()
     minibatch = None
-    if len(sample) > batch_size * 4:
+    if num_partitions > 15000:
         minibatch = batch_size
+    if num_partitions > 60000:
+        minibatch = int(batch_size / 2)
+
     kmeans = KMeans(
         n_clusters=num_partitions,
         mode="euclidean",
