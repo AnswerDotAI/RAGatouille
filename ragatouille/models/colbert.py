@@ -35,7 +35,7 @@ class ColBERT(LateInteractionModel):
         self.pid_docid_map = None
         self.docid_pid_map = None
         self.docid_metadata_map = None
-        self.base_model_max_tokens = 512
+        self.base_model_max_tokens = 510
         if n_gpu == -1:
             n_gpu = 1 if torch.cuda.device_count() == 0 else torch.cuda.device_count()
 
@@ -86,7 +86,7 @@ class ColBERT(LateInteractionModel):
             )
             self.base_model_max_tokens = (
                 self.inference_ckpt.bert.config.max_position_embeddings
-            )
+            ) - 4
 
         self.run_context = Run().context(self.run_config)
         self.run_context.__enter__()  # Manually enter the context
@@ -498,7 +498,11 @@ class ColBERT(LateInteractionModel):
             not hasattr(self, "inference_ckpt_len_set")
             or self.inference_ckpt_len_set is False
         ):
-            if max_tokens == "auto" or max_tokens > self.base_model_max_tokens:
+            if max_tokens == "auto":
+                max_tokens = self.base_model_max_tokens
+            else:
+                max_tokens = int(max_tokens)
+            if max_tokens > self.base_model_max_tokens:
                 max_tokens = self.base_model_max_tokens
                 percentile_90 = np.percentile(
                     [len(x.split(" ")) for x in documents], 90
@@ -508,6 +512,7 @@ class ColBERT(LateInteractionModel):
                     self.base_model_max_tokens,
                 )
                 max_tokens = max(256, max_tokens)
+
                 if max_tokens > 300:
                     print(
                         f"Your documents are roughly {percentile_90} tokens long at the 90th percentile!",
