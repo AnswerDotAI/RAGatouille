@@ -61,7 +61,7 @@ def compute_pytorch_kmeans(
     minibatch = None
     if num_partitions > 15000:
         minibatch = batch_size
-    if num_partitions > 60000:
+    if num_partitions > 30000:
         minibatch = int(batch_size / 2)
 
     kmeans = KMeans(
