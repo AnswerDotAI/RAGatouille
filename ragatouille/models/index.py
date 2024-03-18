@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from copy import deepcopy
 from pathlib import Path
 from time import time
 from typing import Any, List, Literal, Optional, TypeVar, Union
@@ -6,7 +7,10 @@ from typing import Any, List, Literal, Optional, TypeVar, Union
 import srsly
 import torch
 from colbert import Indexer, IndexUpdater, Searcher
+from colbert.indexing.collection_indexer import CollectionIndexer
 from colbert.infra import ColBERTConfig
+
+from ragatouille.models import torch_kmeans
 
 IndexType = Literal["FLAT", "HNSW", "PLAID"]
 
@@ -126,6 +130,8 @@ class HNSWModelIndex(ModelIndex):
 class PLAIDModelIndex(ModelIndex):
     _DEFAULT_INDEX_BSIZE = 32
     index_type = "PLAID"
+    faiss_kmeans = staticmethod(deepcopy(CollectionIndexer._train_kmeans))
+    pytorch_kmeans = staticmethod(torch_kmeans._train_kmeans)
 
     def __init__(self, config: ColBERTConfig) -> None:
         super().__init__(config)
@@ -168,21 +174,6 @@ class PLAIDModelIndex(ModelIndex):
         bsize = kwargs.get("bsize", PLAIDModelIndex._DEFAULT_INDEX_BSIZE)
         assert isinstance(bsize, int)
 
-        if torch.cuda.is_available():
-            import faiss
-
-            if not hasattr(faiss, "StandardGpuResources"):
-                print(
-                    "________________________________________________________________________________\n"
-                    "WARNING! You have a GPU available, but only `faiss-cpu` is currently installed.\n",
-                    "This means that indexing will be slow. To make use of your GPU.\n"
-                    "Please install `faiss-gpu` by running:\n"
-                    "pip uninstall --y faiss-cpu & pip install faiss-gpu\n",
-                    "________________________________________________________________________________",
-                )
-                print("Will continue with CPU indexing in 5 seconds...")
-                time.sleep(5)
-
         nbits = 2
         if len(collection) < 5000:
             nbits = 8
@@ -192,6 +183,9 @@ class PLAIDModelIndex(ModelIndex):
             self.config, ColBERTConfig(nbits=nbits, index_bsize=bsize)
         )
 
+        # Instruct colbert-ai to disable forking if nranks == 1
+        self.config.avoid_fork_if_possible = True
+
         if len(collection) > 100000:
             self.config.kmeans_niters = 4
         elif len(collection) > 50000:
@@ -199,15 +193,66 @@ class PLAIDModelIndex(ModelIndex):
         else:
             self.config.kmeans_niters = 20
 
-        # Instruct colbert-ai to disable forking if nranks == 1
-        self.config.avoid_fork_if_possible = True
-        indexer = Indexer(
-            checkpoint=checkpoint,
-            config=self.config,
-            verbose=verbose,
+        # Monkey-patch colbert-ai to avoid using FAISS
+        monkey_patching = (
+            len(collection) < 100000 and kwargs.get("use_faiss", False) is False
         )
-        indexer.configure(avoid_fork_if_possible=True)
-        indexer.index(name=index_name, collection=collection, overwrite=overwrite)
+        if monkey_patching:
+            print(
+                "---- WARNING! You are using PLAID with an experimental replacement for FAISS for greater compatibility ----"
+            )
+            print("This is a behaviour change from RAGatouille 0.8.0 onwards.")
+            print(
+                "This works fine for most users and smallish datasets, but can be considerably slower than FAISS and could cause worse results in some situations."
+            )
+            print(
+                "If you're confident with FAISS working on your machine, pass use_faiss=True to revert to the FAISS-using behaviour."
+            )
+            print("--------------------")
+            CollectionIndexer._train_kmeans = self.pytorch_kmeans
+
+            # Try to keep runtime stable -- these are values that empirically didn't degrade performance at all on 3 benchmarks.
+            # More tests required before warning can be removed.
+            try:
+                indexer = Indexer(
+                    checkpoint=checkpoint,
+                    config=self.config,
+                    verbose=verbose,
+                )
+                indexer.configure(avoid_fork_if_possible=True)
+                indexer.index(
+                    name=index_name, collection=collection, overwrite=overwrite
+                )
+            except Exception as err:
+                print(
+                    f"PyTorch-based indexing did not succeed with error: {err}",
+                    "! Reverting to using FAISS and attempting again...",
+                )
+                monkey_patching = False
+        if monkey_patching is False:
+            CollectionIndexer._train_kmeans = self.faiss_kmeans
+            if torch.cuda.is_available():
+                import faiss
+
+                if not hasattr(faiss, "StandardGpuResources"):
+                    print(
+                        "________________________________________________________________________________\n"
+                        "WARNING! You have a GPU available, but only `faiss-cpu` is currently installed.\n",
+                        "This means that indexing will be slow. To make use of your GPU.\n"
+                        "Please install `faiss-gpu` by running:\n"
+                        "pip uninstall --y faiss-cpu & pip install faiss-gpu\n",
+                        "________________________________________________________________________________",
+                    )
+                    print("Will continue with CPU indexing in 5 seconds...")
+                    time.sleep(5)
+            indexer = Indexer(
+                checkpoint=checkpoint,
+                config=self.config,
+                verbose=verbose,
+            )
+            indexer.configure(avoid_fork_if_possible=True)
+            indexer.index(name=index_name, collection=collection, overwrite=overwrite)
+
         return self
 
     def _load_searcher(
