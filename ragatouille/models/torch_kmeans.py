@@ -1,9 +1,6 @@
-import time
 
 import torch
 from fast_pytorch_kmeans import KMeans
-import math
-import tqdm
 
 
 def _train_kmeans(self, sample, shared_lists):  # noqa: ARG001
