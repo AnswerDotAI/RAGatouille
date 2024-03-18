@@ -186,9 +186,16 @@ class PLAIDModelIndex(ModelIndex):
         # Instruct colbert-ai to disable forking if nranks == 1
         self.config.avoid_fork_if_possible = True
 
+        if len(collection) > 100000:
+            self.config.kmeans_niters = 4
+        elif len(collection) > 50000:
+            self.config.kmeans_niters = 10
+        else:
+            self.config.kmeans_niters = 20
+
         # Monkey-patch colbert-ai to avoid using FAISS
         monkey_patching = (
-            len(collection) < 40000 and kwargs.get("use_faiss", False) is False
+            len(collection) < 100000 and kwargs.get("use_faiss", False) is False
         )
         if monkey_patching:
             print(
@@ -206,12 +213,6 @@ class PLAIDModelIndex(ModelIndex):
 
             # Try to keep runtime stable -- these are values that empirically didn't degrade performance at all on 3 benchmarks.
             # More tests required before warning can be removed.
-            if len(collection) > 20000:
-                self.config.means_niters = 4
-            elif len(collection) > 10000:
-                self.config.kmeans_niters = 8
-            else:
-                self.config.kmeans_niters = 10
             try:
                 indexer = Indexer(
                     checkpoint=checkpoint,
@@ -229,12 +230,6 @@ class PLAIDModelIndex(ModelIndex):
                 )
                 monkey_patching = False
         if monkey_patching is False:
-            if len(collection) > 100000:
-                self.config.kmeans_niters = 4
-            elif len(collection) > 50000:
-                self.config.kmeans_niters = 10
-            else:
-                self.config.kmeans_niters = 20
             CollectionIndexer._train_kmeans = self.faiss_kmeans
             if torch.cuda.is_available():
                 import faiss
