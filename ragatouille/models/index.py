@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from pathlib import Path
-from time import time
+import time
 from typing import Any, List, Literal, Optional, TypeVar, Union
 
 import srsly
