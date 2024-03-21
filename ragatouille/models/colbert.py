@@ -92,8 +92,11 @@ class ColBERT(LateInteractionModel):
         self.run_context.__enter__()  # Manually enter the context
         self.searcher = None
 
-    def _invert_pid_docid_map(self) -> Dict[str, int]:
-        return {v: k for k, v in self.pid_docid_map.items()}
+    def _invert_pid_docid_map(self) -> Dict[str, List[int]]:
+        d = defaultdict(list)
+        for k, v in self.pid_docid_map.items():
+            d[v].append(k)
+        return d
 
     def _get_collection_files_from_disk(self, index_path: str):
         self.collection = srsly.read_json(index_path / "collection.json")

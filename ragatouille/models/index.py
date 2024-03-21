@@ -1,7 +1,7 @@
+import time
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from pathlib import Path
-import time
 from typing import Any, List, Literal, Optional, TypeVar, Union
 
 import srsly
@@ -195,7 +195,7 @@ class PLAIDModelIndex(ModelIndex):
 
         # Monkey-patch colbert-ai to avoid using FAISS
         monkey_patching = (
-            len(collection) < 100000 and kwargs.get("use_faiss", False) is False
+            len(collection) < 75000 and kwargs.get("use_faiss", False) is False
         )
         if monkey_patching:
             print(
