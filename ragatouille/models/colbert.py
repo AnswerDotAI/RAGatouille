@@ -14,6 +14,8 @@ from colbert.modeling.checkpoint import Checkpoint
 
 from ragatouille.models.base import LateInteractionModel
 from ragatouille.models.index import ModelIndex, ModelIndexFactory
+from ragatouille.evaluation.metrics import resolve_metrics
+
 
 # TODO: Move all bsize related calcs to `_set_bsize()`
 
@@ -744,3 +746,34 @@ class ColBERT(LateInteractionModel):
             self.run_context.__exit__(None, None, None)
         except Exception:
             print("INFO: Tried to clean up context but failed!")
+
+    def evaluate(
+        self,
+        queries: list[str],
+        expected_ids: list[list[str]],
+        metrics: list[str] = None,
+        k: list[int] = None,
+    ) -> dict[str, dict[int, float]]:
+        search_results = self.search(queries, k=max(k))
+        sorted_search_results = [
+            sorted(results, key=lambda x: x["rank"]) for results in search_results
+        ]
+        retrieved_ids = [
+            [result["document_id"] for result in results]
+            for results in sorted_search_results
+        ]
+
+        metric_types = resolve_metrics(metrics)
+        metric_instances = [metric() for metric in metric_types]
+
+        metric_dict = {}
+        for metric in metric_instances:
+            metric_dict[metric.metric_name] = {}
+            for k_ in k:
+                eval_results = [
+                    metric.compute(expected_ids_, retrieved_ids[i][:k_])
+                    for i, expected_ids_ in enumerate(expected_ids)
+                ]
+                metric_dict[metric.metric_name][k_] = np.mean(eval_results)
+
+        return metric_dict

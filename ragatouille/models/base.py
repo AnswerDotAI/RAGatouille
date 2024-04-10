@@ -35,3 +35,12 @@ class LateInteractionModel(ABC):
     @abstractmethod
     def _batch_search(self, name: str, queries: list[str]):
         ...
+
+    @abstractmethod
+    def evaluate(
+        self,
+        queries: list[str],
+        expected_ids: list[list[str]],
+        metrics: list[str],
+        k: list[int],
+    ): ...
