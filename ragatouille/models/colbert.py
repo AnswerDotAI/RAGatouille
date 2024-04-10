@@ -750,16 +750,18 @@ class ColBERT(LateInteractionModel):
     def evaluate(
         self,
         queries: list[str],
-        expected_ids: list[list[str]],
+        expected_ids: list[list[tuple[str, Optional[int]]]],
         metrics: list[str] = None,
         k: list[int] = None,
     ) -> dict[str, dict[int, float]]:
         search_results = self.search(queries, k=max(k))
+        if len(queries) == 1:
+            search_results = [search_results]
         sorted_search_results = [
             sorted(results, key=lambda x: x["rank"]) for results in search_results
         ]
         retrieved_ids = [
-            [result["document_id"] for result in results]
+            [(result["document_id"], result.get("passage_id", None)) for result in results]
             for results in sorted_search_results
         ]
 

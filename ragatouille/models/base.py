@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Union
+from typing import Union, Optional
 
 
 class LateInteractionModel(ABC):
@@ -9,8 +9,7 @@ class LateInteractionModel(ABC):
         self,
         pretrained_model_name_or_path: Union[str, Path],
         n_gpu,
-    ):
-        ...
+    ): ...
 
     @abstractmethod
     def train():
@@ -40,7 +39,8 @@ class LateInteractionModel(ABC):
     def evaluate(
         self,
         queries: list[str],
-        expected_ids: list[list[str]],
+        expected_ids: list[list[tuple[str, Optional[int]]]],
         metrics: list[str],
         k: list[int],
-    ): ...
+    ):
+        ...

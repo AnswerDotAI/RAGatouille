@@ -424,7 +424,7 @@ class RAGPretrainedModel:
     def evaluate(
         self,
         queries: list[str],
-        expected_ids: list[list[str]],
+        expected_ids: list[list[tuple[str, Optional[int]]]],
         metrics: list[str] = None,
         k: list[int] = None,
     ) -> dict[str, dict[int, float]]:
@@ -432,7 +432,7 @@ class RAGPretrainedModel:
 
         Parameters:
             queries (list[str]): A list of queries to evaluate the model on.
-            expected_ids (list[list[str]]): A list of lists of expected document IDs for each query.
+            expected_ids (list[list[tuple[str, Optional[int]]]): A list of lists of expected (document_id, passage_id) tuples for each query. Set passage_id to None if not applicable.
             metrics (list[str]): A list of metrics to evaluate the model on. Valid metrics are "hit_rate", "recall", and "mrr".
             k (list[int]): The numbers of results to consider for each query in the evaluation.
 
