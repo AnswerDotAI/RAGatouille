@@ -20,6 +20,20 @@ def test_indexing():
     assert len(collection) > 1
 
 
-def test_search():
+def test_evaluate():
     RAG = RAGPretrainedModel.from_index(".ragatouille/colbert/indexes/Miyazaki/")
-    k = 3  # How many documents you want to retrieve, defaults to 10, we set it to 3 here for readability
+    k = 3
+
+    results = RAG.search(query="What animation studio did Miyazaki found?", k=k)
+    assert len(results) == k
+
+    metrics = ["hit_rate", "recall", "mrr"]
+    metric_dict = RAG.evaluate(
+        ["What animation studio did Miyazaki found?"],
+        [[(result["document_id"], result["passage_id"]) for result in results[:3]]],
+        metrics,
+        k=[k],
+    )
+
+    for metric in metrics:
+        assert metric_dict[metric][k] == 1.0
