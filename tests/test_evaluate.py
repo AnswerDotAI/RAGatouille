@@ -7,17 +7,14 @@ def mock_search_results(
     queries, search_results, model, expected_ids, metrics, k_values
 ):
     model.model.search = lambda queries, k: search_results
-    return model.evaluate(queries, expected_ids, metrics, k_values)
+    return model.evaluate(queries, expected_ids, metrics=metrics, k=k_values)
 
 
 def test_evaluate():
     model = RAGPretrainedModel.from_pretrained("colbert-ir/colbertv2.0")
 
     queries = ["query1", "query2"]
-    expected_ids = [
-        [("doc1", None), ("doc2", None), ("doc3", None)],
-        [("doc2", None), ("doc3", None), ("doc4", None)],
-    ]
+    expected_ids = [["doc1", "doc2", "doc3"], ["doc2", "doc3", "doc4"]]
 
     metrics = ["recall", "hit_rate", "mrr"]
     k_values = [1, 2, 3]
@@ -90,14 +87,14 @@ def test_evaluate():
 
     search_results3 = [
         [
-            {"document_id": "doc1",  "rank": 1},
-            {"document_id": "doc2",  "rank": 2},
-            {"document_id": "doc3",  "rank": 3},
+            {"document_id": "doc1", "rank": 1},
+            {"document_id": "doc2", "rank": 2},
+            {"document_id": "doc3", "rank": 3},
         ],
         [
-            {"document_id": "doc6",  "rank": 1},
-            {"document_id": "doc5",  "rank": 2},
-            {"document_id": "doc4",  "rank": 3},
+            {"document_id": "doc6", "rank": 1},
+            {"document_id": "doc5", "rank": 2},
+            {"document_id": "doc4", "rank": 3},
         ],
     ]
 

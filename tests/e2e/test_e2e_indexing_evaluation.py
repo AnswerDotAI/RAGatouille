@@ -30,8 +30,9 @@ def test_evaluate():
     metrics = ["hit_rate", "recall", "mrr"]
     metric_dict = RAG.evaluate(
         ["What animation studio did Miyazaki found?"],
-        [[(result["document_id"], result["passage_id"]) for result in results[:3]]],
-        metrics,
+        [[result["document_id"] for result in results[:k]]],
+        [[result["passage_id"] for result in results[:k]]],
+        metrics=metrics,
         k=[k],
     )
 

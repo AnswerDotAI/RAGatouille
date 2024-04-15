@@ -750,7 +750,8 @@ class ColBERT(LateInteractionModel):
     def evaluate(
         self,
         queries: list[str],
-        expected_ids: list[list[tuple[str, Optional[int]]]],
+        expected_document_ids: list[list[str]],
+        expected_passage_ids: list[list[int]] = None,
         metrics: list[str] = None,
         k: list[int] = None,
     ) -> dict[str, dict[int, float]]:
@@ -761,12 +762,32 @@ class ColBERT(LateInteractionModel):
             sorted(results, key=lambda x: x["rank"]) for results in search_results
         ]
         retrieved_ids = [
-            [(result["document_id"], result.get("passage_id", None)) for result in results]
+            [
+                (
+                    (result["document_id"], result["passage_id"])
+                    if expected_passage_ids
+                    else result["document_id"]
+                )
+                for result in results
+            ]
             for results in sorted_search_results
         ]
 
         metric_types = resolve_metrics(metrics)
         metric_instances = [metric() for metric in metric_types]
+
+        if expected_passage_ids:
+            expected_ids = [
+                [
+                    (doc_id, passage_id)
+                    for doc_id, passage_id in zip(doc_ids, passage_ids)
+                ]
+                for doc_ids, passage_ids in zip(
+                    expected_document_ids, expected_passage_ids
+                )
+            ]
+        else:
+            expected_ids = expected_document_ids
 
         metric_dict = {}
         for metric in metric_instances:

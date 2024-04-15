@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Type, Tuple
+from typing import Any, Dict, List, Optional, Type, Tuple, Union
 
 
 class BaseMetric(ABC):
@@ -10,15 +10,15 @@ class BaseMetric(ABC):
     @abstractmethod
     def compute(
         self,
-        expected_ids: Optional[List[Tuple[str, Optional[int]]]] = None,
-        retrieved_ids: Optional[List[Tuple[str, Optional[int]]]] = None,
+        expected_ids: Optional[List[Union[str, Tuple[str, int]]]] = None,
+        retrieved_ids: Optional[List[Union[str, Tuple[str, int]]]] = None,
         **kwargs: Any,
     ) -> float:
         """Compute metric.
 
         Args:
-            expected_ids (Optional[List[Tuple[str, Optional[int]]]]): Expected ids
-            retrieved_ids (Optional[List[Tuple[str, Optional[int]]]]): Retrieved ids
+            expected_ids (Optional[List[Union[str, Tuple[str, int]]]]): Expected ids
+            retrieved_ids (Optional[List[Union[str, Tuple[str, int]]]]): Retrieved ids
             **kwargs: Additional keyword arguments
         """
 
@@ -30,8 +30,8 @@ class HitRate(BaseMetric):
 
     def compute(
         self,
-        expected_ids: Optional[List[Tuple[str, Optional[int]]]] = None,
-        retrieved_ids: Optional[List[Tuple[str, Optional[int]]]] = None,
+        expected_ids: Optional[List[Union[str, Tuple[str, int]]]] = None,
+        retrieved_ids: Optional[List[Union[str, Tuple[str, int]]]] = None,
         **kwargs: Any,
     ) -> float:
         """Compute metric."""
@@ -48,8 +48,8 @@ class Recall(BaseMetric):
 
     def compute(
         self,
-        expected_ids: Optional[List[Tuple[str, Optional[int]]]] = None,
-        retrieved_ids: Optional[List[Tuple[str, Optional[int]]]] = None,
+        expected_ids: Optional[List[Union[str, Tuple[str, int]]]] = None,
+        retrieved_ids: Optional[List[Union[str, Tuple[str, int]]]] = None,
         **kwargs: Any,
     ) -> float:
         """Compute metric."""
@@ -67,8 +67,8 @@ class MRR(BaseMetric):
 
     def compute(
         self,
-        expected_ids: Optional[List[Tuple[str, Optional[int]]]] = None,
-        retrieved_ids: Optional[List[Tuple[str, Optional[int]]]] = None,
+        expected_ids: Optional[List[Union[str, Tuple[str, int]]]] = None,
+        retrieved_ids: Optional[List[Union[str, Tuple[str, int]]]] = None,
         **kwargs: Any,
     ) -> float:
         """Compute metric."""

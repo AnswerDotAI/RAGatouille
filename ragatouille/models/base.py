@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Union, Optional
+from typing import Union
 
 
 class LateInteractionModel(ABC):
@@ -39,7 +39,8 @@ class LateInteractionModel(ABC):
     def evaluate(
         self,
         queries: list[str],
-        expected_ids: list[list[tuple[str, Optional[int]]]],
+        expected_document_ids: list[list[str]],
+        expected_passage_ids: list[list[int]],
         metrics: list[str],
         k: list[int],
     ):

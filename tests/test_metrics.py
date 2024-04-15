@@ -5,13 +5,13 @@ def test_hit_rate():
     hit_rate_metric = HitRate()
 
     # Typical case: Both expected and retrieved IDs are provided, and at least one ID matches
-    expected_ids = [("1", None), ("2", None), ("3", None), ("4", None)]
-    retrieved_ids = [("2", None), ("5", None), ("6", None)]
+    expected_ids = ["1", "2", "3", "4"]
+    retrieved_ids = ["2", "5", "6"]
     assert hit_rate_metric.compute(expected_ids, retrieved_ids) == 1.0
 
     # Typical case: Both expected and retrieved IDs are provided, but no match
-    expected_ids = [("1", None), ("2", None), ("3", None), ("4", None)]
-    retrieved_ids = [("5", None), ("6", None)]
+    expected_ids = ["1", "2", "3", "4"]
+    retrieved_ids = ["5", "6"]
     assert hit_rate_metric.compute(expected_ids, retrieved_ids) == 0.0
 
     # Edge case: Both lists are empty
@@ -21,7 +21,7 @@ def test_hit_rate():
 
     # Edge case: No expected IDs provided
     expected_ids = None
-    retrieved_ids = [("5", None), ("6", None)]
+    retrieved_ids = ["5", "6"]
     try:
         hit_rate_metric.compute(expected_ids, retrieved_ids)
         assert False, "Expected ValueError"
@@ -29,7 +29,7 @@ def test_hit_rate():
         pass
 
     # Edge case: No retrieved IDs provided
-    expected_ids = [("1", None), ("2", None), ("3", None), ("4", None)]
+    expected_ids = ["1", "2", "3", "4"]
     retrieved_ids = None
     try:
         hit_rate_metric.compute(expected_ids, retrieved_ids)
@@ -51,8 +51,8 @@ def test_recall():
     recall_metric = Recall()
 
     # Typical case: Both expected and retrieved IDs are provided
-    expected_ids = [("1", None), ("2", None), ("3", None), ("4", None)]
-    retrieved_ids = [("2", None), ("3", None), ("5", None), ("6", None)]
+    expected_ids = ["1", "2", "3", "4"]
+    retrieved_ids = ["2", "3", "5", "6"]
     assert recall_metric.compute(expected_ids, retrieved_ids) == 2 / 4
 
     # Edge case: Both lists are empty
@@ -61,13 +61,13 @@ def test_recall():
     assert recall_metric.compute(expected_ids, retrieved_ids) == 0.0
 
     # Edge case: No relevant IDs retrieved
-    expected_ids = [("1", None), ("2", None), ("3", None), ("4", None)]
-    retrieved_ids = [("5", None), ("6", None), ("7", None), ("8", None)]
+    expected_ids = ["1", "2", "3", "4"]
+    retrieved_ids = ["5", "6", "7", "8"]
     assert recall_metric.compute(expected_ids, retrieved_ids) == 0.0
 
     # Edge case: No expected IDs provided
     expected_ids = None
-    retrieved_ids = [("5", None), ("6", None), ("7", None), ("8", None)]
+    retrieved_ids = ["5", "6", "7", "8"]
     try:
         recall_metric.compute(expected_ids, retrieved_ids)
         assert False, "Expected ValueError"
@@ -75,7 +75,7 @@ def test_recall():
         pass
 
     # Edge case: No retrieved IDs provided
-    expected_ids = [("1", None), ("2", None), ("3", None), ("4", None)]
+    expected_ids = ["1", "2", "3", "4"]
     retrieved_ids = None
     try:
         recall_metric.compute(expected_ids, retrieved_ids)
@@ -97,18 +97,18 @@ def test_mrr():
     mrr_metric = MRR()
 
     # Typical case: Both expected and retrieved IDs are provided, and the first ID matches
-    expected_ids = [("1", None), ("2", None), ("3", None), ("4", None)]
-    retrieved_ids = [("2", None), ("5", None), ("6", None)]
+    expected_ids = ["1", "2", "3", "4"]
+    retrieved_ids = ["2", "5", "6"]
     assert mrr_metric.compute(expected_ids, retrieved_ids) == 1.0
 
     # Typical case: Both expected and retrieved IDs are provided, and the second ID matches
-    expected_ids = [("1", None), ("2", None), ("3", None), ("4", None)]
-    retrieved_ids = [("5", None), ("2", None), ("6", None)]
+    expected_ids = ["1", "2", "3", "4"]
+    retrieved_ids = ["5", "2", "6"]
     assert mrr_metric.compute(expected_ids, retrieved_ids) == 0.5
 
     # Typical case: Both expected and retrieved IDs are provided, but no match
-    expected_ids = [("1", None), ("2", None), ("3", None), ("4", None)]
-    retrieved_ids = [("5", None), ("6", None)]
+    expected_ids = ["1", "2", "3", "4"]
+    retrieved_ids = ["5", "6"]
     assert mrr_metric.compute(expected_ids, retrieved_ids) == 0.0
 
     # Edge case: Both lists are empty
@@ -118,7 +118,7 @@ def test_mrr():
 
     # Edge case: No expected IDs provided
     expected_ids = None
-    retrieved_ids = [("5", None), ("6", None)]
+    retrieved_ids = ["5", "6"]
     try:
         mrr_metric.compute(expected_ids, retrieved_ids)
         assert False, "Expected ValueError"
@@ -126,7 +126,7 @@ def test_mrr():
         pass
 
     # Edge case: No retrieved IDs provided
-    expected_ids = [("1", None), ("2", None), ("3", None), ("4", None)]
+    expected_ids = ["1", "2", "3", "4"]
     retrieved_ids = None
     try:
         mrr_metric.compute(expected_ids, retrieved_ids)
