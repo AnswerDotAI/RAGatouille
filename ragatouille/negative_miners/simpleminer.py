@@ -64,7 +64,9 @@ class SimpleMiner(HardNegativeMiner):
             embeds = self.model.encode_multi_process(
                 collection, pool, batch_size=batch_size
             )
+            print(102)
             self.model.stop_multi_process_pool(pool)
+            print(103)
         else:
             embeds = self.model.encode(collection, batch_size=batch_size)
 
