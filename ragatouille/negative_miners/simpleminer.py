@@ -58,7 +58,9 @@ class SimpleMiner(HardNegativeMiner):
     ):
         print(f"Building hard negative index for {len(collection)} documents...")
         if len(collection) > 1000:
+            print(100)
             pool = self.model.start_multi_process_pool()
+            print(101)
             embeds = self.model.encode_multi_process(
                 collection, pool, batch_size=batch_size
             )
