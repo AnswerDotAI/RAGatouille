@@ -476,7 +476,7 @@ class ColBERT(LateInteractionModel):
 
         for query in embedded_queries:
             results_for_query = []
-            scores = self._colbert_score(query, embedded_docs, doc_mask) # cpu
+            scores = self._colbert_score(query, embedded_docs, doc_mask)
             sorted_scores = torch.topk(scores, k)
             for rank, doc_idx in enumerate(sorted_scores.indices.tolist()):
                 result = {
