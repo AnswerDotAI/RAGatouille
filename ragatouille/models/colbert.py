@@ -13,7 +13,7 @@ from colbert.infra import ColBERTConfig, Run, RunConfig
 from colbert.modeling.checkpoint import Checkpoint
 
 from ragatouille.models.base import LateInteractionModel
-from ragatouille.index.index import ModelIndex, ModelIndexFactory
+from ragatouille.indexing.index import ModelIndex, ModelIndexFactory
 
 # TODO: Move all bsize related calcs to `_set_bsize()`
 

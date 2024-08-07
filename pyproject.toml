@@ -8,7 +8,8 @@ packages = [
     "ragatouille.models",
     "ragatouille.data",
     "ragatouille.integrations",
-    "ragatouille.negative_miners",
+    "ragatouille.indexing",
+    "ragatouille.training",
 ]
 
 [project]
