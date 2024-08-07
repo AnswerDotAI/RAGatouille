@@ -13,7 +13,7 @@ from colbert.infra import ColBERTConfig, Run, RunConfig
 from colbert.modeling.checkpoint import Checkpoint
 
 from ragatouille.models.base import LateInteractionModel
-from ragatouille.models.index import ModelIndex, ModelIndexFactory
+from ragatouille.index.index import ModelIndex, ModelIndexFactory
 
 # TODO: Move all bsize related calcs to `_set_bsize()`
 
@@ -300,6 +300,7 @@ class ColBERT(LateInteractionModel):
         overwrite: Union[bool, str] = "reuse",
         bsize: int = 32,
         use_faiss: bool = False,
+        model_type: Literal["PLAID", "HNSW"] = "PLAID",
     ):
         self.collection = collection
         self.config.doc_maxlen = max_document_length
@@ -338,17 +339,21 @@ class ColBERT(LateInteractionModel):
 
         self.docid_metadata_map = docid_metadata_map
 
-        self.model_index = ModelIndexFactory.construct(
-            "PLAID",
-            self.config,
-            self.checkpoint,
-            self.collection,
-            self.index_name,
-            overwrite,
-            verbose=self.verbose != 0,
-            bsize=bsize,
-            use_faiss=use_faiss,
-        )
+        if model_type == "PLAID":
+            self.model_index = ModelIndexFactory.construct(
+                model_type,
+                self.config,
+                self.checkpoint,
+                self.collection,
+                self.index_name,
+                overwrite,
+                verbose=self.verbose != 0,
+                bsize=bsize,
+                use_faiss=use_faiss,
+            )
+        elif model_type == "HNSW":
+            encodings = ...
+            raise NotImplementedError
         self.config = self.model_index.config
         self._save_index_metadata()
 
@@ -371,7 +376,11 @@ class ColBERT(LateInteractionModel):
             for doc_id in doc_ids:
                 pids.extend(self.docid_pid_map[doc_id])
 
+        # TODO
+        # force_reload = self._check_index_matches()
+
         force_reload = index_name is not None and index_name != self.index_name
+
         if index_name is not None:
             if self.index_name is not None and self.index_name != index_name:
                 print(
