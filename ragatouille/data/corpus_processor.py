@@ -1,13 +1,13 @@
 from typing import Callable, List, Optional, Union
 from uuid import uuid4
 
-from ragatouille.data.preprocessors import llama_index_sentence_splitter
+from ragatouille.data.preprocessors import simple_sentence_splitter
 
 
 class CorpusProcessor:
     def __init__(
         self,
-        document_splitter_fn: Optional[Callable] = llama_index_sentence_splitter,
+        document_splitter_fn: Optional[Callable] = simple_sentence_splitter,
         preprocessing_fn: Optional[Union[Callable, list[Callable]]] = None,
     ):
         self.document_splitter_fn = document_splitter_fn
