@@ -6,7 +6,7 @@ from langchain.retrievers.document_compressors.base import BaseDocumentCompresso
 from langchain_core.retrievers import BaseRetriever
 
 from ragatouille.data.corpus_processor import CorpusProcessor
-from ragatouille.data.preprocessors import llama_index_sentence_splitter
+from ragatouille.data.preprocessors import simple_sentence_splitter
 from ragatouille.integrations import (
     RAGatouilleLangChainCompressor,
     RAGatouilleLangChainRetriever,
@@ -177,7 +177,7 @@ class RAGPretrainedModel:
         overwrite_index: Union[bool, str] = True,
         max_document_length: int = 256,
         split_documents: bool = True,
-        document_splitter_fn: Optional[Callable] = llama_index_sentence_splitter,
+        document_splitter_fn: Optional[Callable] = simple_sentence_splitter,
         preprocessing_fn: Optional[Union[Callable, list[Callable]]] = None,
         bsize: int = 32,
         use_faiss: bool = False,
@@ -191,7 +191,7 @@ class RAGPretrainedModel:
             overwrite_index (Union[bool, str]): Whether to overwrite an existing index with the same name.
             max_document_length (int): The maximum length of a document. Documents longer than this will be split into chunks.
             split_documents (bool): Whether to split documents into chunks.
-            document_splitter_fn (Optional[Callable]): A function to split documents into chunks. If None and by default, will use the llama_index_sentence_splitter.
+            document_splitter_fn (Optional[Callable]): A function to split documents into chunks. If None and by default, will use the simple_sentence_splitter.
             preprocessing_fn (Optional[Union[Callable, list[Callable]]]): A function or list of functions to preprocess documents. If None and by default, will not preprocess documents.
             bsize (int): The batch size to use for encoding the passages.
 
@@ -226,7 +226,7 @@ class RAGPretrainedModel:
         new_document_metadatas: Optional[list[dict]] = None,
         index_name: Optional[str] = None,
         split_documents: bool = True,
-        document_splitter_fn: Optional[Callable] = llama_index_sentence_splitter,
+        document_splitter_fn: Optional[Callable] = simple_sentence_splitter,
         preprocessing_fn: Optional[Union[Callable, list[Callable]]] = None,
         bsize: int = 32,
         use_faiss: bool = False,
