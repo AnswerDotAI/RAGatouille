@@ -1,39 +1,59 @@
-[tool.poetry]
-name = "RAGatouille"
+[build-system]
+requires = ["setuptools"] 
+build-backend = "setuptools.build_meta" 
+
+[tool.setuptools]
+packages = [
+    "ragatouille",
+    "ragatouille.models",
+    "ragatouille.data",
+    "ragatouille.integrations",
+    "ragatouille.negative_miners",
+]
+
+[project]
+name = "RAGatouille" 
 version = "0.0.8post2"
 description = "Library to facilitate the use of state-of-the-art retrieval models in common RAG contexts."
-authors = ["Benjamin Clavie <ben@clavie.eu>"]
-license = "Apache-2.0"
 readme = "README.md"
-packages = [{include = "ragatouille"}]
-repository = "https://github.com/bclavie/ragatouille"
+requires-python = ">=3.8"
+license = {file = "LICENSE"}
+keywords = ["reranking", "retrieval", "rag", "nlp"]
+authors = [
+  {name = "Ben Clavié", email = "bc@answer.ai" }
+]
+maintainers = [
+  {name = "Ben Clavié", email = "bc@answer.ai" }
+]
 
-[tool.poetry.dependencies]
-python = ">=3.9,<4.0"
-faiss-cpu = "^1.7.4"
-transformers = "^4.36.2"
-voyager = "^2.0.2"
-sentence-transformers = "^2.2.2"
-torch = ">=1.13"
-llama-index = ">=0.7"
-langchain_core = "^0.1.4"
-colbert-ai = "0.2.19"
-langchain = "^0.1.0"
-onnx = "^1.15.0"
-srsly = "2.4.8"
-fast-pytorch-kmeans= "0.2.0.1"
+dependencies = [
+  "llama-index",
+  "faiss-cpu",
+  "langchain_core",
+  "colbert-ai>=0.2.19",
+  "langchain",
+  "onnx",
+  "srsly",
+  "voyager",
+  "torch>=1.13",
+  "fast-pytorch-kmeans",
+  "sentence-transformers",
+]
 
-[tool.poetry.group.dev.dependencies]
-pytest = "^7.4.0"
-mkdocs = "^1.4.3"
-mkdocs-material = "^9.1.18"
-mkdocstrings = "^0.22.0"
-mkdocstrings-python = "^1.1.2"
-ruff = "^0.1.9"
 
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+[project.optional-dependencies]
+all = [
+    "llama-index",
+    "langchain",
+    "rerankers",
+    "voyager",
+]
+llamaindex = ["llama-index"]
+langchain = ["langchain"]
+train = ["sentence-transformers", "rerankers"]
+
+[project.urls]
+"Homepage" = "https://github.com/bclavie/ragatouille"
 
 [tool.pytest.ini_options]
 filterwarnings = [
