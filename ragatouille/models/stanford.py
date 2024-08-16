@@ -1,24 +1,4 @@
-import math
-import os
-import time
-from collections import defaultdict
-from pathlib import Path
-from typing import Dict, List, Literal, Optional, TypeVar, Union
-
-import numpy as np
-import srsly
-import torch
-from colbert import Trainer
-from colbert.infra import ColBERTConfig, Run, RunConfig
-from colbert.modeling.checkpoint import Checkpoint
-
-from ragatouille.models.base import LateInteractionModel
-from ragatouille.indexing.index import ModelIndex, ModelIndexFactory
-
-# TODO: Move all bsize related calcs to `_set_bsize()`
-
-
-class ColBERT(LateInteractionModel):
+class StanfordColBERT(LateInteractionModel):
     def __init__(
         self,
         pretrained_model_name_or_path: Union[str, Path],

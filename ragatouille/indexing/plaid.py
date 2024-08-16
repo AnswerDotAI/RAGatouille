@@ -1,5 +1,4 @@
 import time
-from abc import ABC, abstractmethod
 from copy import deepcopy
 from pathlib import Path
 from typing import Any, List, Literal, Optional, TypeVar, Union
@@ -10,121 +9,8 @@ from colbert import Indexer, IndexUpdater, Searcher
 from colbert.indexing.collection_indexer import CollectionIndexer
 from colbert.infra import ColBERTConfig
 
+from ragatouille.index.base import ModelIndex
 from ragatouille.models import torch_kmeans
-
-IndexType = Literal["FLAT", "HNSW", "PLAID"]
-
-
-class ModelIndex(ABC):
-    index_type: IndexType
-
-    def __init__(
-        self,
-        config: ColBERTConfig,
-    ) -> None:
-        self.config = config
-
-    @staticmethod
-    @abstractmethod
-    def construct(
-        config: ColBERTConfig,
-        checkpoint: str,
-        collection: List[str],
-        index_name: Optional["str"] = None,
-        overwrite: Union[bool, str] = "reuse",
-        verbose: bool = True,
-        **kwargs,
-    ) -> "ModelIndex":
-        ...
-
-    @staticmethod
-    @abstractmethod
-    def load_from_file(
-        index_path: str,
-        index_name: Optional[str],
-        index_config: dict[str, Any],
-        config: ColBERTConfig,
-        verbose: bool = True,
-    ) -> "ModelIndex":
-        ...
-
-    @abstractmethod
-    def build(
-        self,
-        checkpoint: Union[str, Path],
-        collection: List[str],
-        index_name: Optional["str"] = None,
-        overwrite: Union[bool, str] = "reuse",
-        verbose: bool = True,
-    ) -> None:
-        ...
-
-    @abstractmethod
-    def search(
-        self,
-        config: ColBERTConfig,
-        checkpoint: Union[str, Path],
-        collection: List[str],
-        index_name: Optional[str],
-        base_model_max_tokens: int,
-        query: Union[str, list[str]],
-        k: int = 10,
-        pids: Optional[List[int]] = None,
-        force_reload: bool = False,
-        **kwargs,
-    ) -> list[tuple[list, list, list]]:
-        ...
-
-    @abstractmethod
-    def _search(self, query: str, k: int, pids: Optional[List[int]] = None):
-        ...
-
-    @abstractmethod
-    def _batch_search(self, query: list[str], k: int):
-        ...
-
-    @abstractmethod
-    def add(
-        self,
-        config: ColBERTConfig,
-        checkpoint: Union[str, Path],
-        collection: List[str],
-        index_root: str,
-        index_name: str,
-        new_collection: List[str],
-        verbose: bool = True,
-        **kwargs,
-    ) -> None:
-        ...
-
-    @abstractmethod
-    def delete(
-        self,
-        config: ColBERTConfig,
-        checkpoint: Union[str, Path],
-        collection: List[str],
-        index_name: str,
-        pids_to_remove: Union[TypeVar("T"), List[TypeVar("T")]],
-        verbose: bool = True,
-    ) -> None:
-        ...
-
-    @abstractmethod
-    def _export_config(self) -> dict[str, Any]:
-        ...
-
-    def export_metadata(self) -> dict[str, Any]:
-        config = self._export_config()
-        config["index_type"] = self.index_type
-        return config
-
-
-class FLATModelIndex(ModelIndex):
-    index_type = "FLAT"
-
-
-class HNSWModelIndex(ModelIndex):
-    index_type = "HNSW"
 
 
 class PLAIDModelIndex(ModelIndex):
