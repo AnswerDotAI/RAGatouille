@@ -1,0 +1,108 @@
+[build-system]
+requires = ["setuptools"] 
+build-backend = "setuptools.build_meta" 
+
+[tool.setuptools]
+packages = [
+    "ragatouille_lite",
+    "ragatouille_lite.models",
+    "ragatouille_lite.data",
+    "ragatouille_lite.integrations",
+    "ragatouille_lite.indexing",
+]
+
+[project]
+name = "RAGatouille-Lite" 
+version = "0.0.1"
+description = "Library to facilitate the use of state-of-the-art retrieval models in common RAG contexts."
+readme = "README.md"
+requires-python = ">=3.8"
+license = {file = "LICENSE"}
+keywords = ["reranking", "retrieval", "rag", "nlp"]
+authors = [
+  {name = "Ben Clavié", email = "bc@answer.ai" }
+]
+maintainers = [
+  {name = "Ben Clavié", email = "bc@answer.ai" }
+]
+
+dependencies = [
+  "pydantic",
+  "srsly",
+  "voyager",
+  "torch>=1.13",
+  "transformers",
+]
+
+
+[project.optional-dependencies]
+all = [
+    "langchain",
+    "langchain_core"
+]
+langchain = ["langchain", "langchain_core"]
+
+[project.urls]
+"Homepage" = "https://github.com/bclavie/ragatouille"
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore::Warning"
+]
+
+[tool.ruff]
+# Exclude a variety of commonly ignored directories.
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "*.ipynb",
+    "examples",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "venv",
+]
+
+# Same as Black.
+line-length = 88
+output-format = "grouped"
+
+target-version = "py39"
+
+[tool.ruff.lint]
+select = [
+  # bugbear rules
+  "B",
+  "I",
+  # remove unused imports
+  "F401",
+  # bare except statements
+  "E722",
+  # unused arguments
+  "ARG",
+]
+ignore = [
+  "B006",
+  "B018",
+]
+
+unfixable = [
+  "T201",
+  "T203",
+]
+ignore-init-module-imports = true
