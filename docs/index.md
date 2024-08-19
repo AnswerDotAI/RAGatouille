@@ -94,7 +94,7 @@ This is not a slight on them, it's actually very logical! If you think about it:
 - Then, **these vectors must be able to represent your documents and your users' query, that it has never seen, in the same way that it has learned to represent its training data**. 
 - And finally, **it must be able to encode all possible information contained in a document or in a query, so that it may be able to find a relevant document no matter how a question is phrased**
 
-The fact that dense embeddings perform well in these circumstances is very impressive! But sadly, embedding all this information into just a thousand dimensions isn't a problem that has been cracked yet. 
+The fact that dense embeddings perform well in these circumstances is very impressive! But sadly, embedding all this information into just a thousand dimensions is a problem that has been cracked yet. 
 
 ### Bag-of-Embeddings: the Late Interaction trick
 
