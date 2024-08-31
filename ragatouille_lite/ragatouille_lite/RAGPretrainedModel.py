@@ -114,6 +114,8 @@ class RAGPretrainedModel:
         Returns:
             cls (RAGPretrainedModel): The current instance of RAGPretrainedModel, with the model and index initialised.
         """
+
+        """TODO"""
         instance = cls()
         index_path = Path(index_path)
         instance.model = ColBERT(

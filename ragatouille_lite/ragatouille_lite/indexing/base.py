@@ -20,6 +20,10 @@ class ModelIndex(ABC):
         config: Any,
     ) -> None:
         self.config = config
+        self.collection = None
+        self.pid_docid_map = None
+        self.docid_pid_map = None
+        self.docid_metadata_map = None
 
     @staticmethod
     @abstractmethod
