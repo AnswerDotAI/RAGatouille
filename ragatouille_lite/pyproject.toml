@@ -32,6 +32,7 @@ dependencies = [
   "voyager",
   "torch>=1.13",
   "transformers",
+  "pylate>=1.0.0",
 ]
 
 
