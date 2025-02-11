@@ -451,6 +451,7 @@ class ColBERT(LateInteractionModel):
             )
 
             trainer.train(checkpoint=self.checkpoint)
+            return trainer.best_checkpoint_path()
 
     def _colbert_score(self, Q, D_padded, D_mask):
         if ColBERTConfig().total_visible_gpus > 0:
