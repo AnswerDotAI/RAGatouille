@@ -1,98 +1,61 @@
-[tool.poetry]
-name = "RAGatouille"
-version = "0.0.8post4"
-description = "Library to facilitate the use of state-of-the-art retrieval models in common RAG contexts."
-authors = ["Benjamin Clavie <ben@clavie.eu>"]
-license = "Apache-2.0"
-readme = "README.md"
-packages = [{include = "ragatouille"}]
-repository = "https://github.com/bclavie/ragatouille"
-
-[tool.poetry.dependencies]
-python = ">=3.9,<4.0"
-faiss-cpu = "^1.7.4"
-transformers = "^4.36.2"
-voyager = "^2.0.2"
-sentence-transformers = "^2.2.2"
-torch = ">=1.13"
-llama-index = ">=0.7"
-langchain_core = ">=0.1.4"
-langchain = ">=0.1.0"
-colbert-ai = "0.2.19"
-onnx = "^1.15.0"
-srsly = "2.4.8"
-fast-pytorch-kmeans= "0.2.0.1"
-
-[tool.poetry.group.dev.dependencies]
-pytest = "^7.4.0"
-mkdocs = "^1.4.3"
-mkdocs-material = "^9.1.18"
-mkdocstrings = "^0.22.0"
-mkdocstrings-python = "^1.1.2"
-ruff = "^0.1.9"
-
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["setuptools"] 
+build-backend = "setuptools.build_meta" 
+
+[tool.setuptools]
+packages = [
+    "ragatouille",
+    "ragatouille.models",
+    "ragatouille.data",
+    "ragatouille.integrations",
+    "ragatouille.negative_miners",
+]
+
+[project]
+name = "RAGatouille" 
+version = "0.0.9"
+description = "Library to facilitate the use of state-of-the-art retrieval models in common RAG contexts."
+keywords = ["reranking", "retrieval", "rag", "nlp"]
+authors = [
+  {name = "Ben Clavié", email = "bc@answer.ai" }
+]
+maintainers = [
+  {name = "Ben Clavié", email = "bc@answer.ai" }
+]
+license = {file = "LICENSE"}
+readme = "README.md"
+
+dependencies = [
+  "llama-index",
+  "faiss-cpu",
+  "langchain_core",
+  "colbert-ai>=0.2.19",
+  "langchain",
+  "onnx",
+  "srsly",
+  "voyager",
+  "torch>=1.13",
+  "fast-pytorch-kmeans",
+  "sentence-transformers",
+]
+
+[project.optional-dependencies]
+all = [
+    "llama-index",
+    "langchain",
+    "rerankers",
+    "voyager",
+]
+llamaindex = ["llama-index"]
+langchain = ["langchain"]
+train = ["sentence-transformers", "pylate", "rerankers"]
+
+[project.urls]
+"Homepage" = "https://github.com/answerdotai/ragatouille"
 
 [tool.pytest.ini_options]
 filterwarnings = [
     "ignore::Warning"
 ]
 
-[tool.ruff]
-# Exclude a variety of commonly ignored directories.
-exclude = [
-    ".bzr",
-    ".direnv",
-    ".eggs",
-    ".git",
-    ".git-rewrite",
-    ".hg",
-    ".mypy_cache",
-    ".nox",
-    ".pants.d",
-    ".pytype",
-    ".ruff_cache",
-    ".svn",
-    ".tox",
-    ".venv",
-    "__pypackages__",
-    "_build",
-    "*.ipynb",
-    "examples",
-    "buck-out",
-    "build",
-    "dist",
-    "node_modules",
-    "venv",
-]
-
-# Same as Black.
-line-length = 88
-output-format = "grouped"
-
 target-version = "py39"
-
-[tool.ruff.lint]
-select = [
-  # bugbear rules
-  "B",
-  "I",
-  # remove unused imports
-  "F401",
-  # bare except statements
-  "E722",
-  # unused arguments
-  "ARG",
-]
-ignore = [
-  "B006",
-  "B018",
-]
-
-unfixable = [
-  "T201",
-  "T203",
-]
-ignore-init-module-imports = true
