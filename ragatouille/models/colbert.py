@@ -159,12 +159,18 @@ class ColBERT(LateInteractionModel):
                         str(Path(index_root) / self.index_name)
                     )
 
+        # new_documents_with_ids = [
+        #     {"content": doc, "document_id": new_pid_docid_map[pid]}
+        #     for pid, doc in enumerate(new_documents)
+        #     if new_pid_docid_map[pid] not in self.pid_docid_map.values()
+        # ]
+        pid_values = set(self.pid_docid_map.values())
         new_documents_with_ids = [
-            {"content": doc, "document_id": new_pid_docid_map[pid]}
+            {"content": doc, "document_id": new_pid_docid_map[pid]} 
             for pid, doc in enumerate(new_documents)
-            if new_pid_docid_map[pid] not in self.pid_docid_map.values()
+            if new_pid_docid_map[pid] not in pid_values
         ]
-
+        
         max_existing_pid = max(self.pid_docid_map.keys(), default=-1)
         for idx, doc in enumerate(new_documents_with_ids, start=max_existing_pid + 1):
             self.pid_docid_map[idx] = doc["document_id"]
