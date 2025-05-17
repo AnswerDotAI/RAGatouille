@@ -17,9 +17,8 @@ warnings.warn(
     stacklevel=2  # Ensures the warning points to the user's import line
 )
 
-__version__ = "0.0.9post1"
+__version__ = "0.0.9post2"
 from .RAGPretrainedModel import RAGPretrainedModel
-# from .RAGTrainer import RAGTrainer
+from .RAGTrainer import RAGTrainer
 
-# __all__ = ["RAGPretrainedModel", "RAGTrainer"]
-__all__ = ["RAGPretrainedModel"]
+__all__ = ["RAGPretrainedModel", "RAGTrainer"]

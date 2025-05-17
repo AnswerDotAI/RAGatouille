@@ -13,7 +13,7 @@ packages = [
 
 [project]
 name = "RAGatouille" 
-version = "0.0.9post1"
+version = "0.0.9post2"
 description = "Library to facilitate the use of state-of-the-art retrieval models in common RAG contexts."
 keywords = ["reranking", "retrieval", "rag", "nlp"]
 authors = [
