@@ -13,7 +13,7 @@ packages = [
 
 [project]
 name = "RAGatouille" 
-version = "0.0.9post2"
+version = "0.0.9post3"
 description = "Library to facilitate the use of state-of-the-art retrieval models in common RAG contexts."
 keywords = ["reranking", "retrieval", "rag", "nlp"]
 authors = [
@@ -28,9 +28,9 @@ readme = "README.md"
 dependencies = [
   "llama-index",
   "faiss-cpu",
-  "langchain_core",
+  "langchain_core==0.3.77",
   "colbert-ai>=0.2.19",
-  "langchain",
+  "langchain==0.3.27",
   "onnx",
   "srsly",
   "voyager",
