@@ -1,6 +1,6 @@
 from typing import Any, List, Optional, Sequence
 
-from langchain.retrievers.document_compressors.base import BaseDocumentCompressor
+from langchain_core.documents.compressor import BaseDocumentCompressor
 from langchain_core.callbacks.manager import CallbackManagerForRetrieverRun, Callbacks
 from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
