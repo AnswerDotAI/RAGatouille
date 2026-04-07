@@ -2,7 +2,8 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, TypeVar, Union
 from uuid import uuid4
 
-from langchain.retrievers.document_compressors.base import BaseDocumentCompressor
+#from langchain.retrievers.document_compressors.base import BaseDocumentCompressor
+from langchain_classic.retrievers.document_compressors.base import BaseDocumentCompressor
 from langchain_core.retrievers import BaseRetriever
 
 from ragatouille.data.corpus_processor import CorpusProcessor
