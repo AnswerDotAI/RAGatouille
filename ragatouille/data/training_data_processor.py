@@ -262,11 +262,11 @@ class TrainingDataProcessor:
         # Create the directory if it does not exist
         os.makedirs(path, exist_ok=True)
 
-        with open(path / "queries.train.colbert.tsv", "w") as f:
+        with open(path / "queries.train.colbert.tsv", "w", encoding="utf-8") as f:
             for query, idx in self.query_map.items():
                 query = query.replace("\t", " ").replace("\n", " ")
                 f.write(f"{idx}\t{query}\n")
-        with open(path / "corpus.train.colbert.tsv", "w") as f:
+        with open(path / "corpus.train.colbert.tsv", "w", encoding="utf-8") as f:
             for document, idx in self.passage_map.items():
                 document = document.replace("\t", " ").replace("\n", " ")
                 f.write(f"{idx}\t{document}\n")
