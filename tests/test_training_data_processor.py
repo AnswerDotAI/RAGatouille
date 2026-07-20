@@ -34,3 +34,19 @@ def test_process_raw_data_with_miner(collection, queries):
     processor.process_raw_data(raw_data=[], data_type="pairs", data_dir="./")
 
     processor._process_raw_pairs.assert_called_once()
+
+
+def test_export_training_data_writes_utf8(tmp_path, collection, queries):
+    """Non-ASCII text must survive export on Windows (cp1252) locales (#268)."""
+    processor = TrainingDataProcessor(collection, queries, None)
+    processor.query_map = {"Merhaba ıüöğç": 0}
+    processor.passage_map = {"İstanbul ğ": 0}
+    processor.training_triplets = []
+
+    processor.export_training_data(tmp_path)
+
+    queries_tsv = (tmp_path / "queries.train.colbert.tsv").read_text(encoding="utf-8")
+    corpus_tsv = (tmp_path / "corpus.train.colbert.tsv").read_text(encoding="utf-8")
+    assert "Merhaba ıüöğç" in queries_tsv
+    assert "İstanbul ğ" in corpus_tsv
+
